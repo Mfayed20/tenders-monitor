@@ -1,0 +1,168 @@
+"""
+Telegram notification for matched EV tenders.
+
+Sends a compact digest message via Telegram Bot API using httpx (no extra library).
+
+Setup:
+    1. Create a bot via @BotFather → copy the token
+    2. Send any message to your bot, then get your chat_id from:
+       https://api.telegram.org/bot<TOKEN>/getUpdates
+    3. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in your .env file
+
+If either env var is missing, notifications are silently skipped.
+"""
+
+import logging
+import os
+from typing import TYPE_CHECKING
+
+import httpx
+
+if TYPE_CHECKING:
+    from utils.notifier import TenderRow
+
+logger = logging.getLogger(__name__)
+
+_API_BASE = "https://api.telegram.org/bot{token}/sendMessage"
+_MAX_MESSAGE_LEN = 4096  # Telegram hard limit
+
+
+def _urgency_label(days_left: int | None) -> str:
+    if days_left is None:
+        return ""
+    if days_left <= 3:
+        return " [URGENT]"
+    if days_left <= 7:
+        return " [Soon]"
+    return ""
+
+
+def _format_tender(t: "TenderRow", index: int) -> str:
+    urgency = _urgency_label(t.days_left)
+    deadline = t.close_date if t.close_date else "Unknown"
+    days = f" ({t.days_left}d left)" if t.days_left is not None else ""
+
+    lines = [
+        f"*{index}.{urgency} [{t.company_match}]*",
+        f"{t.title}",
+        f"Source: {t.site}  |  Ref: {t.ref_number}",
+        f"Deadline: {deadline}{days}",
+        f"[View tender]({t.link})",
+    ]
+    return "\n".join(lines)
+
+
+def _build_messages(tenders: list["TenderRow"], date_str: str) -> list[str]:
+    """
+    Build a single Telegram message with Climatech and EVS sections.
+    Splits into multiple messages only if the total exceeds 4096 chars.
+    """
+    climatech = [t for t in tenders if t.company_match in ("Climatech", "Both")]
+    evs = [t for t in tenders if t.company_match in ("EVS", "Both")]
+
+    # Build full message as one block
+    parts = []
+    parts.append(
+        f"*KSA EV Tenders - {date_str}*\n"
+        f"{len(tenders)} new match{'es' if len(tenders) != 1 else ''} found"
+    )
+
+    if climatech:
+        parts.append(f"\n*-- Climatech Charger ({len(climatech)}) --*")
+        for i, t in enumerate(climatech, 1):
+            parts.append("\n" + _format_tender(t, i))
+
+    if evs:
+        parts.append(f"\n*-- EVS ({len(evs)}) --*")
+        for i, t in enumerate(evs, 1):
+            parts.append("\n" + _format_tender(t, i))
+
+    # Join and split only if over Telegram limit
+    full_text = "\n".join(parts)
+    if len(full_text) <= _MAX_MESSAGE_LEN:
+        return [full_text]
+
+    # Fallback: split into chunks if extremely long
+    messages = []
+    current = ""
+    for part in parts:
+        if len(current) + len(part) + 1 > _MAX_MESSAGE_LEN:
+            messages.append(current)
+            current = part
+        else:
+            current = (current + "\n" + part).lstrip()
+    if current:
+        messages.append(current)
+    return messages
+
+
+async def send_telegram_alert(
+    tenders: list["TenderRow"],
+    date_str: str,
+    bot_token: str | None = None,
+    chat_id: str | None = None,
+) -> bool:
+    """
+    Send matched tenders as a Telegram digest message.
+
+    Args:
+        tenders:   List of matched TenderRow objects.
+        date_str:  Run date string (e.g. "2025-03-29").
+        bot_token: Telegram bot token. Falls back to TELEGRAM_BOT_TOKEN env var.
+        chat_id:   Telegram chat/channel ID. Falls back to TELEGRAM_CHAT_ID env var.
+
+    Returns:
+        True if all messages sent successfully, False otherwise.
+    """
+    token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    cid = chat_id or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not token or not cid:
+        logger.debug("Telegram not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID missing)")
+        return False
+
+    url = _API_BASE.format(token=token)
+
+    # Always send a status message, even when no matches found
+    if not tenders:
+        no_match_msg = (
+            f"*KSA EV Tenders - {date_str}*\n"
+            f"Run complete. No new EV-related tenders found today."
+        )
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                resp = await client.post(url, json={
+                    "chat_id": cid,
+                    "text": no_match_msg,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
+                })
+                resp.raise_for_status()
+                logger.info("Telegram no-match status sent")
+            except Exception as exc:
+                logger.error("Telegram send failed: %s", exc)
+                return False
+        return True
+
+    messages = _build_messages(tenders, date_str)
+    success = True
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        for msg in messages:
+            try:
+                resp = await client.post(url, json={
+                    "chat_id": cid,
+                    "text": msg,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
+                })
+                resp.raise_for_status()
+                logger.info("Telegram message sent (%d chars)", len(msg))
+            except httpx.HTTPStatusError as exc:
+                logger.error("Telegram API error: %s — %s", exc.response.status_code, exc.response.text)
+                success = False
+            except Exception as exc:
+                logger.error("Telegram send failed: %s", exc)
+                success = False
+
+    return success

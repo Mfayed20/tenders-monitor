@@ -37,6 +37,7 @@ from utils.keywords import match_tender
 from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ
 from utils.dedup import is_seen, mark_seen, purge_old
 from utils.notifier import send_email, TenderRow
+from utils.telegram_notifier import send_telegram_alert
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -274,7 +275,7 @@ async def main():
 
     # Step 4: Send email (only if matches found)
     if matched and not args.no_email:
-        logger.info("Step 3: Sending email notification...")
+        logger.info("Step 4: Sending email notification...")
         success = send_email(matched, date_str)
         if success:
             logger.info("Email sent successfully")
@@ -284,6 +285,13 @@ async def main():
         logger.info("No new matching tenders — no email sent")
     else:
         logger.info("Email skipped (--no-email flag)")
+
+    # Step 5: Send Telegram alert (always — matches or no matches)
+    tg_ok = await send_telegram_alert(matched, date_str)
+    if tg_ok:
+        logger.info("Telegram alert sent successfully")
+    else:
+        logger.debug("Telegram alert skipped or failed (check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)")
 
     # Summary
     logger.info("=" * 60)

@@ -6,27 +6,29 @@ Three matching layers:
 1. Simple keywords   — direct substring match
 2. Compound keywords — keyword matches only if an EV-context word also appears
 3. Negative keywords — rejects false positives even after a positive match
+
+Keywords are loaded from config/keywords.yaml if it exists, falling back to
+the hardcoded defaults below.
 """
 
+import logging
 import re
 from dataclasses import dataclass
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Negative keywords — reject tender if ANY of these appear
+# Hardcoded defaults (used as fallback if keywords.yaml is missing)
 # ---------------------------------------------------------------------------
 
-NEGATIVE_KEYWORDS = [
+_DEFAULT_NEGATIVE = [
     "drone", "railway", "railroad", "rail line", "metro line",
     "tramway", "forklift", "generator set", "elevator", "escalator",
     "phone charger", "laptop charger", "ups battery",
 ]
 
-# ---------------------------------------------------------------------------
-# Climatech Charger — chargers, installation, infrastructure, CPO
-# ---------------------------------------------------------------------------
-
-CLIMATECH_KEYWORDS_EN = [
-    # Core charging
+_DEFAULT_CLIMATECH_EN = [
     "ev charging", "ev charger", "electric vehicle charging",
     "charger installation", "charging station", "charging infrastructure",
     "dc fast charger", "ac charger", "level 2 charger",
@@ -34,94 +36,58 @@ CLIMATECH_KEYWORDS_EN = [
     "charging point", "charging equipment",
     "charging network", "smart charging",
     "supercharger",
-    # Operator / management
     "cpo", "charge point operator",
     "cpms", "charge point management",
     "ocpp", "ocpi",
-    # Regulation
     "sec certified", "sec certification",
-    # Maintenance of chargers
     "charger maintenance",
-    # Energy management
     "load balancing", "load management",
-    # Broader
     "ev infrastructure",
     "e-mobility", "emobility",
 ]
 
-CLIMATECH_KEYWORDS_AR = [
-    "شحن السيارات الكهربائية",       # EV charging
-    "شاحن سيارات كهربائية",         # EV charger
-    "شاحن كهربائي",                 # electric charger
-    "محطة شحن",                     # charging station
-    "تركيب شاحن",                   # charger installation
-    "بنية تحتية للشحن",             # charging infrastructure
-    "المشغل المسؤول عن الشحن",      # CPO
-    "نقطة شحن",                     # charging point
-    "شاحن سريع",                    # fast charger
-    "شبكة شحن",                     # charging network
-    "الشحن الذكي",                  # smart charging
-    "هيئة تنظيم الكهرباء",          # SEC (electricity regulator)
-    # New
-    "إدارة نقاط الشحن",             # charge point management
-    "تشغيل نقاط الشحن",             # charge point operation
-    "صيانة الشواحن",                # charger maintenance
-    "تجهيز موقع الشحن",             # charging site preparation
+_DEFAULT_CLIMATECH_AR = [
+    "شحن السيارات الكهربائية", "شاحن سيارات كهربائية", "شاحن كهربائي",
+    "محطة شحن", "تركيب شاحن", "بنية تحتية للشحن",
+    "المشغل المسؤول عن الشحن", "نقطة شحن", "شاحن سريع",
+    "شبكة شحن", "الشحن الذكي", "هيئة تنظيم الكهرباء",
+    "إدارة نقاط الشحن", "تشغيل نقاط الشحن",
+    "صيانة الشواحن", "تجهيز موقع الشحن",
 ]
 
-# Compound: keyword only matches if an EV-context word is also present
-CLIMATECH_COMPOUND_EN = [
+_DEFAULT_CLIMATECH_COMPOUND_EN = [
     ("commissioning", ["charger", "ev", "charging", "شحن", "شاحن"]),
     ("electrical works", ["charger", "ev", "charging", "شحن"]),
     ("site preparation", ["charger", "ev", "charging", "شحن"]),
 ]
 
-CLIMATECH_COMPOUND_AR = [
-    ("أعمال كهربائية", ["شحن", "شاحن", "ev", "charger"]),   # electrical works + charging
-    ("تجهيز الموقع", ["شحن", "شاحن", "ev", "charger"]),     # site preparation + charging
+_DEFAULT_CLIMATECH_COMPOUND_AR = [
+    ("أعمال كهربائية", ["شحن", "شاحن", "ev", "charger"]),
+    ("تجهيز الموقع", ["شحن", "شاحن", "ev", "charger"]),
 ]
 
-# ---------------------------------------------------------------------------
-# EVS — EV Service, Maintenance & Repair
-# ---------------------------------------------------------------------------
-
-EVS_KEYWORDS_EN = [
-    # Core maintenance
+_DEFAULT_EVS_EN = [
     "ev maintenance", "electric vehicle maintenance",
     "fleet maintenance", "fleet management", "ev fleet",
-    # Service
     "ev service", "ev servicing",
-    # Repair
     "ev repair", "collision repair",
     "battery repair", "battery diagnostics",
     "ev diagnostics", "powertrain repair",
-    # Vehicles
     "electric bus", "electric truck",
-    # Periodic
     "periodic servicing",
 ]
 
-EVS_KEYWORDS_AR = [
-    "صيانة السيارات الكهربائية",     # EV maintenance
-    "صيانة مركبات كهربائية",         # electric vehicle maintenance
-    "صيانة الأسطول",                 # fleet maintenance
-    "إدارة الأسطول",                 # fleet management
-    "أسطول كهربائي",                 # electric fleet
-    "حافلة كهربائية",               # electric bus
-    "شاحنة كهربائية",               # electric truck
-    # New
-    "خدمة المركبات الكهربائية",      # EV service
-    "إصلاح المركبات الكهربائية",     # EV repair
-    "إصلاح البطارية",               # battery repair
-    "تشخيص البطارية",               # battery diagnostics
-    "ورشة مركبات كهربائية",         # EV workshop
-    "قطع غيار المركبات الكهربائية",  # EV spare parts
-    "صيانة وقائية",                 # preventive maintenance
-    "هيكل ودهان",                   # body & paint
+_DEFAULT_EVS_AR = [
+    "صيانة السيارات الكهربائية", "صيانة مركبات كهربائية",
+    "صيانة الأسطول", "إدارة الأسطول", "أسطول كهربائي",
+    "حافلة كهربائية", "شاحنة كهربائية",
+    "خدمة المركبات الكهربائية", "إصلاح المركبات الكهربائية",
+    "إصلاح البطارية", "تشخيص البطارية",
+    "ورشة مركبات كهربائية", "قطع غيار المركبات الكهربائية",
+    "صيانة وقائية", "هيكل ودهان",
 ]
 
-# Compound: keyword only matches if an EV-context word is also present
-EVS_COMPOUND_EN = [
+_DEFAULT_EVS_COMPOUND_EN = [
     ("body shop", ["ev", "electric", "كهربائ"]),
     ("bodywork", ["ev", "electric", "كهربائ"]),
     ("spare parts", ["ev", "electric", "كهربائ"]),
@@ -133,11 +99,86 @@ EVS_COMPOUND_EN = [
     ("vehicle repair", ["ev", "electric", "كهربائ"]),
 ]
 
-EVS_COMPOUND_AR = [
-    ("ورشة", ["كهربائ", "ev", "electric"]),         # workshop + electric
-    ("قطع غيار", ["كهربائ", "ev", "electric"]),      # spare parts + electric
-    ("فحص مركبات", ["كهربائ", "ev", "electric"]),    # vehicle inspection + electric
+_DEFAULT_EVS_COMPOUND_AR = [
+    ("ورشة", ["كهربائ", "ev", "electric"]),
+    ("قطع غيار", ["كهربائ", "ev", "electric"]),
+    ("فحص مركبات", ["كهربائ", "ev", "electric"]),
 ]
+
+
+# ---------------------------------------------------------------------------
+# YAML loader
+# ---------------------------------------------------------------------------
+
+def _load_yaml_keywords(yaml_path: Path) -> dict | None:
+    """Load keyword config from YAML. Returns None if unavailable."""
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        logger.debug("PyYAML not installed — using hardcoded keywords")
+        return None
+
+    if not yaml_path.exists():
+        logger.debug("keywords.yaml not found at %s — using hardcoded keywords", yaml_path)
+        return None
+
+    try:
+        with open(yaml_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        logger.info("Keywords loaded from %s", yaml_path)
+        return data
+    except Exception as exc:
+        logger.warning("Failed to parse keywords.yaml (%s) — using hardcoded keywords", exc)
+        return None
+
+
+def _parse_compounds(entries: list) -> list[tuple]:
+    """Convert YAML compound entries to (keyword, context_list) tuples."""
+    result = []
+    for entry in (entries or []):
+        if isinstance(entry, dict):
+            kw = entry.get("keyword", "").strip()
+            # Strip inline YAML comments (e.g. "ورشة              # workshop")
+            kw = kw.split("#")[0].strip()
+            ctx = [str(c) for c in entry.get("context", [])]
+            if kw:
+                result.append((kw, ctx))
+    return result
+
+
+def _strip_comments(values: list) -> list[str]:
+    """Strip inline YAML comments from string list items."""
+    out = []
+    for v in (values or []):
+        s = str(v).split("#")[0].strip()
+        if s:
+            out.append(s)
+    return out
+
+
+_YAML_PATH = Path(__file__).resolve().parent.parent / "config" / "keywords.yaml"
+_yaml_data = _load_yaml_keywords(_YAML_PATH)
+
+if _yaml_data:
+    NEGATIVE_KEYWORDS      = _strip_comments(_yaml_data.get("negative", []))
+    CLIMATECH_KEYWORDS_EN  = _strip_comments(_yaml_data.get("climatech", {}).get("simple_en", []))
+    CLIMATECH_KEYWORDS_AR  = _strip_comments(_yaml_data.get("climatech", {}).get("simple_ar", []))
+    CLIMATECH_COMPOUND_EN  = _parse_compounds(_yaml_data.get("climatech", {}).get("compound_en", []))
+    CLIMATECH_COMPOUND_AR  = _parse_compounds(_yaml_data.get("climatech", {}).get("compound_ar", []))
+    EVS_KEYWORDS_EN        = _strip_comments(_yaml_data.get("evs", {}).get("simple_en", []))
+    EVS_KEYWORDS_AR        = _strip_comments(_yaml_data.get("evs", {}).get("simple_ar", []))
+    EVS_COMPOUND_EN        = _parse_compounds(_yaml_data.get("evs", {}).get("compound_en", []))
+    EVS_COMPOUND_AR        = _parse_compounds(_yaml_data.get("evs", {}).get("compound_ar", []))
+else:
+    NEGATIVE_KEYWORDS      = _DEFAULT_NEGATIVE
+    CLIMATECH_KEYWORDS_EN  = _DEFAULT_CLIMATECH_EN
+    CLIMATECH_KEYWORDS_AR  = _DEFAULT_CLIMATECH_AR
+    CLIMATECH_COMPOUND_EN  = _DEFAULT_CLIMATECH_COMPOUND_EN
+    CLIMATECH_COMPOUND_AR  = _DEFAULT_CLIMATECH_COMPOUND_AR
+    EVS_KEYWORDS_EN        = _DEFAULT_EVS_EN
+    EVS_KEYWORDS_AR        = _DEFAULT_EVS_AR
+    EVS_COMPOUND_EN        = _DEFAULT_EVS_COMPOUND_EN
+    EVS_COMPOUND_AR        = _DEFAULT_EVS_COMPOUND_AR
 
 # ---------------------------------------------------------------------------
 # Combined list (for sites that support keyword search queries)

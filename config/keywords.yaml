@@ -1,0 +1,160 @@
+# EV Tender Keywords Configuration
+# Edit this file to add/remove keywords without touching Python code.
+#
+# Structure:
+#   simple_en / simple_ar  — direct substring match
+#   compound_en / compound_ar — keyword matches ONLY if one of its context words also appears
+#   negative               — reject tender if ANY of these appear (shared across companies)
+
+# ---------------------------------------------------------------------------
+# Negative keywords — reject tender regardless of positive match
+# ---------------------------------------------------------------------------
+negative:
+  - drone
+  - railway
+  - railroad
+  - rail line
+  - metro line
+  - tramway
+  - forklift
+  - generator set
+  - elevator
+  - escalator
+  - phone charger
+  - laptop charger
+  - ups battery
+
+# ---------------------------------------------------------------------------
+# Climatech Charger — chargers, installation, infrastructure, CPO
+# ---------------------------------------------------------------------------
+climatech:
+  simple_en:
+    - ev charging
+    - ev charger
+    - electric vehicle charging
+    - charger installation
+    - charging station
+    - charging infrastructure
+    - dc fast charger
+    - ac charger
+    - level 2 charger
+    - battery charger
+    - battery charging
+    - charging point
+    - charging equipment
+    - charging network
+    - smart charging
+    - supercharger
+    - cpo
+    - charge point operator
+    - cpms
+    - charge point management
+    - ocpp
+    - ocpi
+    - sec certified
+    - sec certification
+    - charger maintenance
+    - load balancing
+    - load management
+    - ev infrastructure
+    - e-mobility
+    - emobility
+
+  simple_ar:
+    - شحن السيارات الكهربائية       # EV charging
+    - شاحن سيارات كهربائية         # EV charger
+    - شاحن كهربائي                 # electric charger
+    - محطة شحن                     # charging station
+    - تركيب شاحن                   # charger installation
+    - بنية تحتية للشحن             # charging infrastructure
+    - المشغل المسؤول عن الشحن      # CPO
+    - نقطة شحن                     # charging point
+    - شاحن سريع                    # fast charger
+    - شبكة شحن                     # charging network
+    - الشحن الذكي                  # smart charging
+    - هيئة تنظيم الكهرباء          # SEC (electricity regulator)
+    - إدارة نقاط الشحن             # charge point management
+    - تشغيل نقاط الشحن             # charge point operation
+    - صيانة الشواحن                # charger maintenance
+    - تجهيز موقع الشحن             # charging site preparation
+
+  compound_en:
+    - keyword: commissioning
+      context: [charger, ev, charging, شحن, شاحن]
+    - keyword: electrical works
+      context: [charger, ev, charging, شحن]
+    - keyword: site preparation
+      context: [charger, ev, charging, شحن]
+
+  compound_ar:
+    - keyword: أعمال كهربائية      # electrical works
+      context: [شحن, شاحن, ev, charger]
+    - keyword: تجهيز الموقع        # site preparation
+      context: [شحن, شاحن, ev, charger]
+
+# ---------------------------------------------------------------------------
+# EVS — EV Service, Maintenance & Repair
+# ---------------------------------------------------------------------------
+evs:
+  simple_en:
+    - ev maintenance
+    - electric vehicle maintenance
+    - fleet maintenance
+    - fleet management
+    - ev fleet
+    - ev service
+    - ev servicing
+    - ev repair
+    - collision repair
+    - battery repair
+    - battery diagnostics
+    - ev diagnostics
+    - powertrain repair
+    - electric bus
+    - electric truck
+    - periodic servicing
+
+  simple_ar:
+    - صيانة السيارات الكهربائية     # EV maintenance
+    - صيانة مركبات كهربائية         # electric vehicle maintenance
+    - صيانة الأسطول                 # fleet maintenance
+    - إدارة الأسطول                 # fleet management
+    - أسطول كهربائي                 # electric fleet
+    - حافلة كهربائية               # electric bus
+    - شاحنة كهربائية               # electric truck
+    - خدمة المركبات الكهربائية      # EV service
+    - إصلاح المركبات الكهربائية     # EV repair
+    - إصلاح البطارية               # battery repair
+    - تشخيص البطارية               # battery diagnostics
+    - ورشة مركبات كهربائية         # EV workshop
+    - قطع غيار المركبات الكهربائية  # EV spare parts
+    - صيانة وقائية                 # preventive maintenance
+    - هيكل ودهان                   # body & paint
+
+  compound_en:
+    - keyword: body shop
+      context: [ev, electric, كهربائ]
+    - keyword: bodywork
+      context: [ev, electric, كهربائ]
+    - keyword: spare parts
+      context: [ev, electric, كهربائ]
+    - keyword: workshop
+      context: [ev, electric, كهربائ]
+    - keyword: service center
+      context: [ev, electric, كهربائ]
+    - keyword: vehicle inspection
+      context: [ev, electric, كهربائ]
+    - keyword: preventive maintenance
+      context: [ev, electric, fleet, كهربائ, أسطول]
+    - keyword: inverter
+      context: [ev, electric, كهربائ]
+    - keyword: vehicle repair
+      context: [ev, electric, كهربائ]
+
+  compound_ar:
+    - keyword: ورشة              # workshop
+      context: [كهربائ, ev, electric]
+    - keyword: قطع غيار          # spare parts
+      context: [كهربائ, ev, electric]
+    - keyword: فحص مركبات        # vehicle inspection
+      context: [كهربائ, ev, electric]
