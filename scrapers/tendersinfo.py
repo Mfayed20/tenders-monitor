@@ -51,11 +51,13 @@ class TendersInfoScraper(BaseScraper):
                 "Origin": "https://www.tendersinfo.com",
             },
         ) as client:
-            for query in self.SEARCH_QUERIES:
+            # Fetch all queries concurrently
+            import asyncio
+
+            async def _fetch_query(query):
                 encoded = query.replace(" ", "%20")
                 url = f"{self.API_URL}/{encoded}/location"
                 self.logger.info("Fetching TendersInfo API: %s", query)
-
                 try:
                     payload = {
                         "draw": "1",
@@ -70,9 +72,17 @@ class TendersInfoScraper(BaseScraper):
                     }
                     response = await client.post(url, data=payload)
                     response.raise_for_status()
-                    data = response.json()
+                    return query, response.json()
                 except Exception:
                     self.logger.exception("Failed to fetch TendersInfo for query: %s", query)
+                    return query, None
+
+            results = await asyncio.gather(
+                *[_fetch_query(q) for q in self.SEARCH_QUERIES]
+            )
+
+            for query, data in results:
+                if data is None:
                     continue
 
                 records = data.get("data", [])

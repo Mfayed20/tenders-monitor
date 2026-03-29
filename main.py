@@ -2,12 +2,11 @@
 KSA EV Tender Monitor — Daily scraper for Saudi Arabia EV-related tenders.
 
 Scrapes 5 tender sites, filters by EV keywords (English + Arabic),
-deduplicates, outputs CSV, and sends HTML email alerts.
+deduplicates, outputs CSV, and sends Telegram alerts.
 
 Usage:
-    python main.py              # Full run: scrape + filter + email
-    python main.py --no-email   # Scrape + CSV only, no email
-    python main.py --purge      # Purge old dedup records (90 days)
+    python main.py         # Full run: scrape + filter + CSV + Telegram
+    python main.py --purge # Purge old dedup records (90 days)
 
 Companies:
     Climatech Charger — chargers, installation, infrastructure, CPO
@@ -21,6 +20,7 @@ import html
 import logging
 import re
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -36,8 +36,21 @@ from scrapers.base import Tender
 from utils.keywords import match_tender
 from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ
 from utils.dedup import is_seen, mark_seen, purge_old
-from utils.notifier import send_email, TenderRow
 from utils.telegram_notifier import send_telegram_alert
+
+@dataclass
+class TenderRow:
+    site: str
+    title: str
+    ref_number: str
+    publish_date: str
+    close_date: str
+    days_left: int | None  # days until closing
+    link: str
+    company_match: str
+    matched_keywords: str  # comma-separated keywords that triggered the match
+    description: str  # tender description/scope (truncated)
+
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -109,14 +122,16 @@ async def run_scrapers() -> list[Tender]:
                 else:
                     all_tenders.extend(result)
 
-        # Run browser-based scrapers sequentially (shared browser)
+        # Run browser-based scrapers concurrently (separate contexts)
         browser_scrapers = [s for s in SCRAPERS if s.NEEDS_BROWSER]
-        for scraper in browser_scrapers:
-            try:
-                result = await scraper.scrape(browser=browser)
-                all_tenders.extend(result)
-            except Exception:
-                logger.exception("Scraper %s failed", scraper.SITE_NAME)
+        if browser_scrapers:
+            browser_tasks = [s.scrape(browser=browser) for s in browser_scrapers]
+            browser_results = await asyncio.gather(*browser_tasks, return_exceptions=True)
+            for scraper, result in zip(browser_scrapers, browser_results):
+                if isinstance(result, Exception):
+                    logger.error("Scraper %s failed: %s", scraper.SITE_NAME, result)
+                else:
+                    all_tenders.extend(result)
 
     finally:
         if browser:
@@ -242,7 +257,6 @@ def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
 
 async def main():
     parser = argparse.ArgumentParser(description="KSA EV Tender Monitor")
-    parser.add_argument("--no-email", action="store_true", help="Skip email notification")
     parser.add_argument("--purge", action="store_true", help="Purge old dedup records and exit")
     args = parser.parse_args()
 
@@ -273,20 +287,7 @@ async def main():
     # Step 3: Write CSV (always, even if empty — for audit trail)
     csv_path = write_csv(matched, date_str)
 
-    # Step 4: Send email (only if matches found)
-    if matched and not args.no_email:
-        logger.info("Step 4: Sending email notification...")
-        success = send_email(matched, date_str)
-        if success:
-            logger.info("Email sent successfully")
-        else:
-            logger.warning("Email sending failed — check credentials")
-    elif not matched:
-        logger.info("No new matching tenders — no email sent")
-    else:
-        logger.info("Email skipped (--no-email flag)")
-
-    # Step 5: Send Telegram alert (always — matches or no matches)
+    # Step 4: Send Telegram alert (always — matches or no matches)
     tg_ok = await send_telegram_alert(matched, date_str)
     if tg_ok:
         logger.info("Telegram alert sent successfully")

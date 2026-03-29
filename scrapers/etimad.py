@@ -64,7 +64,6 @@ class EtimadScraper(BaseScraper):
 
                 tenders.extend(page_tenders)
                 self.logger.info("Found %d tenders on page %d", len(page_tenders), page_num)
-                await asyncio.sleep(2)
 
         finally:
             await context.close()

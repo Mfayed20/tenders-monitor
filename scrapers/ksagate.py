@@ -45,31 +45,36 @@ class KSAGateScraper(BaseScraper):
                 "Accept": "application/json",
             },
         ) as client:
-            for page_num in range(1, self.MAX_PAGES + 1):
-                url = f"{self.API_URL}?per_page={self.PER_PAGE}&page={page_num}"
-                self.logger.info("Fetching KSAGate API page %d", page_num)
+            # Fetch all pages concurrently
+            urls = [
+                f"{self.API_URL}?per_page={self.PER_PAGE}&page={p}"
+                for p in range(1, self.MAX_PAGES + 1)
+            ]
+            self.logger.info("Fetching KSAGate API pages 1-%d concurrently", self.MAX_PAGES)
 
+            async def _fetch_page(url, page_num):
                 try:
                     response = await client.get(url)
                     if response.status_code == 400:
-                        # WP returns 400 when page exceeds total
-                        self.logger.info("No more pages at page %d", page_num)
-                        break
+                        return []
                     response.raise_for_status()
-                    data = response.json()
+                    return response.json()
                 except Exception:
                     self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
-                    break
+                    return []
 
+            import asyncio
+            results = await asyncio.gather(
+                *[_fetch_page(url, i + 1) for i, url in enumerate(urls)]
+            )
+
+            for page_num, data in enumerate(results, 1):
                 if not data:
-                    self.logger.info("Empty response at page %d — stopping", page_num)
-                    break
-
+                    continue
                 for item in data:
                     tender = self._parse_api_item(item)
                     if tender:
                         tenders.append(tender)
-
                 self.logger.info("Found %d tenders on page %d", len(data), page_num)
 
         self.logger.info("KSAGate total: %d tenders scraped", len(tenders))
