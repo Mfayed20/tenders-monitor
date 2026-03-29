@@ -1,0 +1,295 @@
+"""
+KSA EV Tender Monitor — Daily scraper for Saudi Arabia EV-related tenders.
+
+Scrapes 5 tender sites, filters by EV keywords (English + Arabic),
+deduplicates, outputs CSV, and sends HTML email alerts.
+
+Usage:
+    python main.py              # Full run: scrape + filter + email
+    python main.py --no-email   # Scrape + CSV only, no email
+    python main.py --purge      # Purge old dedup records (90 days)
+
+Companies:
+    Climatech Charger — chargers, installation, infrastructure, CPO
+    EVS — fleet maintenance, service, repair, management
+"""
+
+import argparse
+import asyncio
+import csv
+import html
+import logging
+import re
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from scrapers.etimad import EtimadScraper
+from scrapers.ksagate import KSAGateScraper
+from scrapers.tendersa import TendersaScraper
+from scrapers.tendersinfo import TendersInfoScraper
+from scrapers.metenders import METendersScraper
+from scrapers.tendersontime import TendersOnTimeScraper
+from scrapers.base import Tender
+from utils.keywords import match_tender
+from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ
+from utils.dedup import is_seen, mark_seen, purge_old
+from utils.notifier import send_email, TenderRow
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
+load_dotenv()
+
+LOG_DIR = Path(__file__).resolve().parent / "output"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(LOG_DIR / "tender_monitor.log", encoding="utf-8"),
+    ],
+)
+logger = logging.getLogger("main")
+
+# All scrapers to run
+SCRAPERS = [
+    EtimadScraper(),
+    KSAGateScraper(),
+    TendersaScraper(),
+    TendersInfoScraper(),
+    METendersScraper(),
+    TendersOnTimeScraper(),
+]
+
+
+# ---------------------------------------------------------------------------
+# Core pipeline
+# ---------------------------------------------------------------------------
+
+async def run_scrapers() -> list[Tender]:
+    """Run all scrapers, using a shared Playwright browser for JS-heavy sites."""
+    all_tenders: list[Tender] = []
+    browser = None
+
+    # Check if any scraper needs a browser
+    needs_browser = any(s.NEEDS_BROWSER for s in SCRAPERS)
+
+    try:
+        if needs_browser:
+            from playwright.async_api import async_playwright
+            pw = await async_playwright().start()
+            browser = await pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                ],
+            )
+            logger.info("Playwright browser launched")
+
+        # Run httpx-based scrapers concurrently
+        http_scrapers = [s for s in SCRAPERS if not s.NEEDS_BROWSER]
+        http_tasks = [s.scrape() for s in http_scrapers]
+
+        if http_tasks:
+            results = await asyncio.gather(*http_tasks, return_exceptions=True)
+            for scraper, result in zip(http_scrapers, results):
+                if isinstance(result, Exception):
+                    logger.error(
+                        "Scraper %s failed: %s", scraper.SITE_NAME, result
+                    )
+                else:
+                    all_tenders.extend(result)
+
+        # Run browser-based scrapers sequentially (shared browser)
+        browser_scrapers = [s for s in SCRAPERS if s.NEEDS_BROWSER]
+        for scraper in browser_scrapers:
+            try:
+                result = await scraper.scrape(browser=browser)
+                all_tenders.extend(result)
+            except Exception:
+                logger.exception("Scraper %s failed", scraper.SITE_NAME)
+
+    finally:
+        if browser:
+            await browser.close()
+            await pw.stop()
+            logger.info("Playwright browser closed")
+
+    return all_tenders
+
+
+def _clean_title(raw: str, max_len: int = 120) -> str:
+    """Clean up a raw tender title for display."""
+    text = html.unescape(raw)                      # &lt;/br&gt; -> </br>
+    text = re.sub(r"<[^>]+>", " ", text)            # strip HTML tags
+    text = re.sub(r"##[^#]*##", "", text)           # strip ##quantity: 9##
+    text = re.sub(r"\s*,\s*,+", ",", text)          # collapse repeated commas
+    text = re.sub(r"\s+", " ", text).strip()        # collapse whitespace
+    if len(text) > max_len:
+        text = text[:max_len].rsplit(" ", 1)[0] + "..."
+    return text
+
+
+def filter_tenders(tenders: list[Tender]) -> list[TenderRow]:
+    """
+    Filter tenders by:
+    1. EV keyword match (English + Arabic)
+    2. Published within last 7 days — if publish date available
+       (EV tenders are rare; 24h is too aggressive)
+    3. Closing within 30 days — if close date available
+    4. Not previously seen (dedup)
+    """
+    matched = []
+
+    for t in tenders:
+        # Keyword match
+        result = match_tender(t.title, t.description)
+        if not result.matched:
+            continue
+
+        # Time filters (conservative: include if dates unknown)
+        if not is_new_tender(t.publish_date, hours=168):  # 7 days
+            continue
+        if not is_closing_soon(t.close_date):
+            continue
+
+        # Dedup
+        if is_seen(t.site, t.title, t.ref_number):
+            logger.debug("Already seen: %s — %s", t.site, t.title[:50])
+            continue
+
+        # Mark as seen
+        mark_seen(t.site, t.title, t.ref_number)
+
+        # Calculate days until closing
+        days_left = None
+        if t.close_date:
+            delta = t.close_date - datetime.now(KSA_TZ)
+            days_left = max(0, delta.days)
+
+        matched.append(TenderRow(
+            site=t.site,
+            title=_clean_title(t.title),
+            ref_number=t.ref_number or "N/A",
+            publish_date=format_date(t.publish_date),
+            close_date=format_date(t.close_date),
+            days_left=days_left,
+            link=t.link,
+            company_match=result.company,
+            matched_keywords=", ".join(result.matched_keywords[:5]),
+            description=t.description[:200] if t.description else "",
+        ))
+
+    return matched
+
+
+def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
+    """Write matched tenders to a daily CSV (append) and a master CSV (cumulative)."""
+    csv_path = LOG_DIR / f"tenders_{date_str}.csv"
+
+    if not tenders:
+        logger.info("No matches — skipping CSV write")
+        return csv_path
+
+    HEADER = [
+        "Site", "Title", "Ref#", "Published", "Deadline",
+        "Days Left", "Link", "Match (Company)", "Keywords", "Description",
+    ]
+
+    def _to_row(t):
+        return [
+            t.site, t.title, t.ref_number,
+            t.publish_date, t.close_date,
+            t.days_left if t.days_left is not None else "N/A",
+            t.link, t.company_match, t.matched_keywords, t.description,
+        ]
+
+    # 1. Daily CSV (append — preserves results from earlier runs the same day)
+    write_header = not csv_path.exists()
+    with open(csv_path, "a", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        if write_header:
+            writer.writerow(HEADER)
+        for t in tenders:
+            writer.writerow(_to_row(t))
+
+    # 2. Master CSV (cumulative — all matches ever found)
+    master_path = LOG_DIR / "all_tenders.csv"
+    write_master_header = not master_path.exists()
+    with open(master_path, "a", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        if write_master_header:
+            writer.writerow(HEADER)
+        for t in tenders:
+            writer.writerow(_to_row(t))
+
+    logger.info("CSV written: %s (%d rows), master: %s", csv_path.name, len(tenders), master_path.name)
+    return csv_path
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+async def main():
+    parser = argparse.ArgumentParser(description="KSA EV Tender Monitor")
+    parser.add_argument("--no-email", action="store_true", help="Skip email notification")
+    parser.add_argument("--purge", action="store_true", help="Purge old dedup records and exit")
+    args = parser.parse_args()
+
+    if args.purge:
+        count = purge_old(days=90)
+        logger.info("Purged %d old dedup records", count)
+        return
+
+    date_str = datetime.now(KSA_TZ).strftime("%Y-%m-%d")
+    logger.info("=" * 60)
+    logger.info("KSA EV Tender Monitor — Run started: %s", date_str)
+    logger.info("=" * 60)
+
+    # Step 1: Scrape all sites
+    logger.info("Step 1: Scraping %d sites...", len(SCRAPERS))
+    all_tenders = await run_scrapers()
+    logger.info("Total raw tenders scraped: %d", len(all_tenders))
+
+    if not all_tenders:
+        logger.warning("No tenders scraped from any site — check scrapers")
+        return
+
+    # Step 2: Filter by keywords, dates, dedup
+    logger.info("Step 2: Filtering tenders...")
+    matched = filter_tenders(all_tenders)
+    logger.info("Matched tenders after filtering: %d", len(matched))
+
+    # Step 3: Write CSV (always, even if empty — for audit trail)
+    csv_path = write_csv(matched, date_str)
+
+    # Step 4: Send email (only if matches found)
+    if matched and not args.no_email:
+        logger.info("Step 3: Sending email notification...")
+        success = send_email(matched, date_str)
+        if success:
+            logger.info("Email sent successfully")
+        else:
+            logger.warning("Email sending failed — check credentials")
+    elif not matched:
+        logger.info("No new matching tenders — no email sent")
+    else:
+        logger.info("Email skipped (--no-email flag)")
+
+    # Summary
+    logger.info("=" * 60)
+    logger.info("Run complete. CSV: %s | Matches: %d", csv_path.name, len(matched))
+    logger.info("=" * 60)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

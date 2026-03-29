@@ -1,0 +1,127 @@
+"""
+Scraper for tendersa.com — Saudi Arabia tender aggregator.
+URL: https://www.tendersa.com/TendersSearch.aspx
+
+Uses Playwright since the listing page is ASP.NET with dynamic content.
+Tenders are in .details-wrapper containers with structured fields:
+- Title: .FirstRowTndrNam h4 a
+- Publish date: .take-off div
+- Close date: .landing div
+- Status: .total-time span
+- Ref ID: span[id*="lblTenderJoID"]
+"""
+
+import asyncio
+import logging
+import re
+
+from bs4 import BeautifulSoup
+
+from scrapers.base import BaseScraper, Tender
+from utils.dates import parse_date
+
+logger = logging.getLogger(__name__)
+
+
+class TendersaScraper(BaseScraper):
+    SITE_NAME = "TenderSA"
+    BASE_URL = "https://www.tendersa.com"
+    SEARCH_URL = "https://www.tendersa.com/TendersSearch.aspx"
+    NEEDS_BROWSER = True
+
+    async def scrape(self, browser=None) -> list[Tender]:
+        if browser is None:
+            self.logger.error("TenderSA requires a Playwright browser instance")
+            return []
+
+        tenders = []
+        context = await browser.new_context(
+            locale="ar-SA",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+        page = await context.new_page()
+
+        try:
+            self.logger.info("Fetching TenderSA search page")
+            html = await self.fetch_with_browser(
+                page, self.SEARCH_URL,
+                wait_selector=".details-wrapper",
+            )
+            tenders = self._parse_page(html)
+            self.logger.info("Found %d tenders on TenderSA", len(tenders))
+
+        except Exception:
+            self.logger.exception("Failed to scrape TenderSA")
+        finally:
+            await context.close()
+
+        self.logger.info("TenderSA total: %d tenders scraped", len(tenders))
+        return tenders
+
+    def _parse_page(self, html: str) -> list[Tender]:
+        soup = BeautifulSoup(html, "lxml")
+        tenders = []
+
+        wrappers = soup.select(".details-wrapper")
+        for wrapper in wrappers:
+            tender = self._parse_wrapper(wrapper)
+            if tender:
+                tenders.append(tender)
+
+        return tenders
+
+    def _parse_wrapper(self, wrapper) -> Tender | None:
+        """Parse a single .details-wrapper into a Tender."""
+        # Title and link
+        title_el = wrapper.select_one(
+            ".FirstRowTndrNam h4 a[href*='TenderDetails'], "
+            ".FirstRowTndrNam a[href*='TenderDetails']"
+        )
+        if not title_el:
+            return None
+
+        title = title_el.get_text(strip=True)
+        if not title or len(title) < 5:
+            return None
+
+        href = title_el.get("href", "")
+        link = f"{self.BASE_URL}/{href}" if href and not href.startswith("http") else href
+
+        # Publish date — inside .take-off div
+        publish_date = None
+        takeoff = wrapper.select_one(".take-off")
+        if takeoff:
+            text = takeoff.get_text()
+            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
+            if date_match:
+                publish_date = parse_date(date_match.group(1))
+
+        # Close date — inside .landing div
+        close_date = None
+        landing = wrapper.select_one(".landing")
+        if landing:
+            text = landing.get_text()
+            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
+            if date_match:
+                close_date = parse_date(date_match.group(1))
+
+        # Ref ID
+        ref_el = wrapper.select_one("span[id*='lblTenderJoID']")
+        ref_number = ref_el.get_text(strip=True) if ref_el else ""
+
+        # Extract tdc_id from link as fallback ref
+        if not ref_number and "tdc_id=" in href:
+            ref_number = href.split("tdc_id=")[-1]
+
+        return Tender(
+            site=self.SITE_NAME,
+            title=title,
+            ref_number=ref_number,
+            publish_date=publish_date,
+            close_date=close_date,
+            link=link,
+        )
