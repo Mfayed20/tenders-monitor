@@ -5,6 +5,10 @@
 #   simple_en / simple_ar  — direct substring match
 #   compound_en / compound_ar — keyword matches ONLY if one of its context words also appears
 #   negative               — reject tender if ANY of these appear (shared across companies)
+#
+# Context words in compound keywords use WORD-BOUNDARY matching for Latin words
+# (e.g. "ev" won't match "development", "electric" won't match "electrical").
+# Arabic context words use substring matching.
 
 # ---------------------------------------------------------------------------
 # Negative keywords — reject tender regardless of positive match
@@ -29,6 +33,7 @@ negative:
 # ---------------------------------------------------------------------------
 climatech:
   simple_en:
+    # Core charging
     - ev charging
     - ev charger
     - electric vehicle charging
@@ -38,24 +43,24 @@ climatech:
     - dc fast charger
     - ac charger
     - level 2 charger
-    - battery charger
-    - battery charging
     - charging point
     - charging equipment
     - charging network
     - smart charging
     - supercharger
+    # Operator / management
     - cpo
     - charge point operator
     - cpms
     - charge point management
     - ocpp
     - ocpi
+    # Regulation
     - sec certified
     - sec certification
+    # Maintenance of chargers
     - charger maintenance
-    - load balancing
-    - load management
+    # Broader
     - ev infrastructure
     - e-mobility
     - emobility
@@ -72,66 +77,68 @@ climatech:
     - شاحن سريع                    # fast charger
     - شبكة شحن                     # charging network
     - الشحن الذكي                  # smart charging
-    - هيئة تنظيم الكهرباء          # SEC (electricity regulator)
     - إدارة نقاط الشحن             # charge point management
     - تشغيل نقاط الشحن             # charge point operation
     - صيانة الشواحن                # charger maintenance
     - تجهيز موقع الشحن             # charging site preparation
 
   compound_en:
+    # Existing
     - keyword: commissioning
       context: [charger, ev, charging, شحن, شاحن]
     - keyword: electrical works
       context: [charger, ev, charging, شحن]
     - keyword: site preparation
       context: [charger, ev, charging, شحن]
+    # Moved from simple — too generic without EV context
+    - keyword: battery charger
+      context: [ev, electric vehicle, charging station, محطة شحن]
+    - keyword: battery charging
+      context: [ev, electric vehicle, charging station, محطة شحن]
+    - keyword: load balancing
+      context: [charger, ev, charging, شحن, شاحن]
+    - keyword: load management
+      context: [charger, ev, charging, شحن, شاحن]
 
   compound_ar:
-    - keyword: أعمال كهربائية      # electrical works
+    - keyword: أعمال كهربائية        # electrical works
       context: [شحن, شاحن, ev, charger]
-    - keyword: تجهيز الموقع        # site preparation
+    - keyword: تجهيز الموقع          # site preparation
       context: [شحن, شاحن, ev, charger]
+    # Moved from simple — SEC regulates all electrical work, not just EV
+    - keyword: هيئة تنظيم الكهرباء   # SEC (electricity regulator)
+      context: [شحن, شاحن, charger, ev, charging]
 
 # ---------------------------------------------------------------------------
 # EVS — EV Service, Maintenance & Repair
 # ---------------------------------------------------------------------------
 evs:
   simple_en:
+    # Core — specific enough (contain "ev" or "electric")
     - ev maintenance
     - electric vehicle maintenance
-    - fleet maintenance
-    - fleet management
     - ev fleet
     - ev service
     - ev servicing
     - ev repair
-    - collision repair
-    - battery repair
-    - battery diagnostics
     - ev diagnostics
-    - powertrain repair
     - electric bus
     - electric truck
-    - periodic servicing
 
   simple_ar:
+    # Specific — contain "كهربائية" (electric)
     - صيانة السيارات الكهربائية     # EV maintenance
     - صيانة مركبات كهربائية         # electric vehicle maintenance
-    - صيانة الأسطول                 # fleet maintenance
-    - إدارة الأسطول                 # fleet management
     - أسطول كهربائي                 # electric fleet
     - حافلة كهربائية               # electric bus
     - شاحنة كهربائية               # electric truck
     - خدمة المركبات الكهربائية      # EV service
     - إصلاح المركبات الكهربائية     # EV repair
-    - إصلاح البطارية               # battery repair
-    - تشخيص البطارية               # battery diagnostics
     - ورشة مركبات كهربائية         # EV workshop
     - قطع غيار المركبات الكهربائية  # EV spare parts
-    - صيانة وقائية                 # preventive maintenance
-    - هيكل ودهان                   # body & paint
 
   compound_en:
+    # Existing — already properly scoped
     - keyword: body shop
       context: [ev, electric, كهربائ]
     - keyword: bodywork
@@ -144,17 +151,46 @@ evs:
       context: [ev, electric, كهربائ]
     - keyword: vehicle inspection
       context: [ev, electric, كهربائ]
-    - keyword: preventive maintenance
-      context: [ev, electric, fleet, كهربائ, أسطول]
     - keyword: inverter
       context: [ev, electric, كهربائ]
     - keyword: vehicle repair
       context: [ev, electric, كهربائ]
+    # Moved from simple — too generic without EV context
+    - keyword: fleet maintenance
+      context: [ev, electric, كهربائ]
+    - keyword: fleet management
+      context: [ev, electric, كهربائ]
+    - keyword: collision repair
+      context: [ev, electric, كهربائ]
+    - keyword: battery repair
+      context: [ev, electric, كهربائ]
+    - keyword: battery diagnostics
+      context: [ev, electric, كهربائ]
+    - keyword: powertrain repair
+      context: [ev, electric, كهربائ]
+    - keyword: periodic servicing
+      context: [ev, electric, كهربائ]
+    - keyword: preventive maintenance
+      context: [ev, electric, fleet, كهربائ, أسطول]
 
   compound_ar:
-    - keyword: ورشة              # workshop
+    # Existing
+    - keyword: ورشة                  # workshop
       context: [كهربائ, ev, electric]
-    - keyword: قطع غيار          # spare parts
+    - keyword: قطع غيار              # spare parts
       context: [كهربائ, ev, electric]
-    - keyword: فحص مركبات        # vehicle inspection
+    - keyword: فحص مركبات            # vehicle inspection
       context: [كهربائ, ev, electric]
+    # Moved from simple — too generic without EV context
+    - keyword: صيانة الأسطول          # fleet maintenance
+      context: [كهربائ, ev, electric]
+    - keyword: إدارة الأسطول          # fleet management
+      context: [كهربائ, ev, electric]
+    - keyword: إصلاح البطارية         # battery repair
+      context: [كهربائ, ev, electric, مركبة]
+    - keyword: تشخيص البطارية         # battery diagnostics
+      context: [كهربائ, ev, electric, مركبة]
+    - keyword: صيانة وقائية           # preventive maintenance
+      context: [كهربائ, ev, electric, أسطول]
+    - keyword: هيكل ودهان             # body & paint
+      context: [كهربائ, ev, electric, مركبة]

@@ -32,7 +32,6 @@ _DEFAULT_CLIMATECH_EN = [
     "ev charging", "ev charger", "electric vehicle charging",
     "charger installation", "charging station", "charging infrastructure",
     "dc fast charger", "ac charger", "level 2 charger",
-    "battery charger", "battery charging",
     "charging point", "charging equipment",
     "charging network", "smart charging",
     "supercharger",
@@ -41,7 +40,6 @@ _DEFAULT_CLIMATECH_EN = [
     "ocpp", "ocpi",
     "sec certified", "sec certification",
     "charger maintenance",
-    "load balancing", "load management",
     "ev infrastructure",
     "e-mobility", "emobility",
 ]
@@ -50,7 +48,7 @@ _DEFAULT_CLIMATECH_AR = [
     "شحن السيارات الكهربائية", "شاحن سيارات كهربائية", "شاحن كهربائي",
     "محطة شحن", "تركيب شاحن", "بنية تحتية للشحن",
     "المشغل المسؤول عن الشحن", "نقطة شحن", "شاحن سريع",
-    "شبكة شحن", "الشحن الذكي", "هيئة تنظيم الكهرباء",
+    "شبكة شحن", "الشحن الذكي",
     "إدارة نقاط الشحن", "تشغيل نقاط الشحن",
     "صيانة الشواحن", "تجهيز موقع الشحن",
 ]
@@ -59,32 +57,33 @@ _DEFAULT_CLIMATECH_COMPOUND_EN = [
     ("commissioning", ["charger", "ev", "charging", "شحن", "شاحن"]),
     ("electrical works", ["charger", "ev", "charging", "شحن"]),
     ("site preparation", ["charger", "ev", "charging", "شحن"]),
+    ("battery charger", ["ev", "electric vehicle", "charging station", "محطة شحن"]),
+    ("battery charging", ["ev", "electric vehicle", "charging station", "محطة شحن"]),
+    ("load balancing", ["charger", "ev", "charging", "شحن", "شاحن"]),
+    ("load management", ["charger", "ev", "charging", "شحن", "شاحن"]),
 ]
 
 _DEFAULT_CLIMATECH_COMPOUND_AR = [
     ("أعمال كهربائية", ["شحن", "شاحن", "ev", "charger"]),
     ("تجهيز الموقع", ["شحن", "شاحن", "ev", "charger"]),
+    ("هيئة تنظيم الكهرباء", ["شحن", "شاحن", "charger", "ev", "charging"]),
 ]
 
 _DEFAULT_EVS_EN = [
     "ev maintenance", "electric vehicle maintenance",
-    "fleet maintenance", "fleet management", "ev fleet",
+    "ev fleet",
     "ev service", "ev servicing",
-    "ev repair", "collision repair",
-    "battery repair", "battery diagnostics",
-    "ev diagnostics", "powertrain repair",
+    "ev repair",
+    "ev diagnostics",
     "electric bus", "electric truck",
-    "periodic servicing",
 ]
 
 _DEFAULT_EVS_AR = [
     "صيانة السيارات الكهربائية", "صيانة مركبات كهربائية",
-    "صيانة الأسطول", "إدارة الأسطول", "أسطول كهربائي",
+    "أسطول كهربائي",
     "حافلة كهربائية", "شاحنة كهربائية",
     "خدمة المركبات الكهربائية", "إصلاح المركبات الكهربائية",
-    "إصلاح البطارية", "تشخيص البطارية",
     "ورشة مركبات كهربائية", "قطع غيار المركبات الكهربائية",
-    "صيانة وقائية", "هيكل ودهان",
 ]
 
 _DEFAULT_EVS_COMPOUND_EN = [
@@ -94,15 +93,28 @@ _DEFAULT_EVS_COMPOUND_EN = [
     ("workshop", ["ev", "electric", "كهربائ"]),
     ("service center", ["ev", "electric", "كهربائ"]),
     ("vehicle inspection", ["ev", "electric", "كهربائ"]),
-    ("preventive maintenance", ["ev", "electric", "fleet", "كهربائ", "أسطول"]),
     ("inverter", ["ev", "electric", "كهربائ"]),
     ("vehicle repair", ["ev", "electric", "كهربائ"]),
+    ("fleet maintenance", ["ev", "electric", "كهربائ"]),
+    ("fleet management", ["ev", "electric", "كهربائ"]),
+    ("collision repair", ["ev", "electric", "كهربائ"]),
+    ("battery repair", ["ev", "electric", "كهربائ"]),
+    ("battery diagnostics", ["ev", "electric", "كهربائ"]),
+    ("powertrain repair", ["ev", "electric", "كهربائ"]),
+    ("periodic servicing", ["ev", "electric", "كهربائ"]),
+    ("preventive maintenance", ["ev", "electric", "fleet", "كهربائ", "أسطول"]),
 ]
 
 _DEFAULT_EVS_COMPOUND_AR = [
     ("ورشة", ["كهربائ", "ev", "electric"]),
     ("قطع غيار", ["كهربائ", "ev", "electric"]),
     ("فحص مركبات", ["كهربائ", "ev", "electric"]),
+    ("صيانة الأسطول", ["كهربائ", "ev", "electric"]),
+    ("إدارة الأسطول", ["كهربائ", "ev", "electric"]),
+    ("إصلاح البطارية", ["كهربائ", "ev", "electric", "مركبة"]),
+    ("تشخيص البطارية", ["كهربائ", "ev", "electric", "مركبة"]),
+    ("صيانة وقائية", ["كهربائ", "ev", "electric", "أسطول"]),
+    ("هيكل ودهان", ["كهربائ", "ev", "electric", "مركبة"]),
 ]
 
 
@@ -179,21 +191,6 @@ else:
     EVS_KEYWORDS_AR        = _DEFAULT_EVS_AR
     EVS_COMPOUND_EN        = _DEFAULT_EVS_COMPOUND_EN
     EVS_COMPOUND_AR        = _DEFAULT_EVS_COMPOUND_AR
-
-# ---------------------------------------------------------------------------
-# Combined list (for sites that support keyword search queries)
-# ---------------------------------------------------------------------------
-
-KEYWORDS_EN = list(dict.fromkeys(
-    CLIMATECH_KEYWORDS_EN + EVS_KEYWORDS_EN
-))
-
-KEYWORDS_AR = list(dict.fromkeys(
-    CLIMATECH_KEYWORDS_AR + EVS_KEYWORDS_AR
-))
-
-# Also add the general umbrella terms
-KEYWORDS_EN += ["electric vehicle", "مركبة كهربائية"]
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +298,3 @@ def match_tender(title: str, description: str = "") -> MatchResult:
     )
 
 
-def get_all_keywords() -> list[str]:
-    """Return all keywords combined (for sites that support search)."""
-    return KEYWORDS_EN + KEYWORDS_AR
