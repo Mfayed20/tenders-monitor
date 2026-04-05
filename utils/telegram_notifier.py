@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 if TYPE_CHECKING:
-    from utils.notifier import TenderRow
+    from main import TenderRow
 
 logger = logging.getLogger(__name__)
 

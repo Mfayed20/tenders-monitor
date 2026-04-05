@@ -87,34 +87,94 @@ _DEFAULT_EVS_AR = [
 ]
 
 _DEFAULT_EVS_COMPOUND_EN = [
-    ("body shop", ["ev", "electric", "كهربائ"]),
-    ("bodywork", ["ev", "electric", "كهربائ"]),
-    ("spare parts", ["ev", "electric", "كهربائ"]),
-    ("workshop", ["ev", "electric", "كهربائ"]),
-    ("service center", ["ev", "electric", "كهربائ"]),
-    ("vehicle inspection", ["ev", "electric", "كهربائ"]),
-    ("inverter", ["ev", "electric", "كهربائ"]),
-    ("vehicle repair", ["ev", "electric", "كهربائ"]),
-    ("fleet maintenance", ["ev", "electric", "كهربائ"]),
-    ("fleet management", ["ev", "electric", "كهربائ"]),
-    ("collision repair", ["ev", "electric", "كهربائ"]),
-    ("battery repair", ["ev", "electric", "كهربائ"]),
-    ("battery diagnostics", ["ev", "electric", "كهربائ"]),
-    ("powertrain repair", ["ev", "electric", "كهربائ"]),
-    ("periodic servicing", ["ev", "electric", "كهربائ"]),
-    ("preventive maintenance", ["ev", "electric", "fleet", "كهربائ", "أسطول"]),
+    ("body shop", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("bodywork", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("spare parts", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("workshop", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("service center", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("vehicle inspection", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("inverter", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("vehicle repair", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("fleet maintenance", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("fleet management", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("collision repair", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("battery repair", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("battery diagnostics", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("powertrain repair", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("periodic servicing", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("preventive maintenance", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
 ]
 
 _DEFAULT_EVS_COMPOUND_AR = [
-    ("ورشة", ["كهربائ", "ev", "electric"]),
-    ("قطع غيار", ["كهربائ", "ev", "electric"]),
-    ("فحص مركبات", ["كهربائ", "ev", "electric"]),
-    ("صيانة الأسطول", ["كهربائ", "ev", "electric"]),
-    ("إدارة الأسطول", ["كهربائ", "ev", "electric"]),
-    ("إصلاح البطارية", ["كهربائ", "ev", "electric", "مركبة"]),
-    ("تشخيص البطارية", ["كهربائ", "ev", "electric", "مركبة"]),
-    ("صيانة وقائية", ["كهربائ", "ev", "electric", "أسطول"]),
-    ("هيكل ودهان", ["كهربائ", "ev", "electric", "مركبة"]),
+    ("ورشة", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("قطع غيار", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("فحص مركبات", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("صيانة الأسطول", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("إدارة الأسطول", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("إصلاح البطارية", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("تشخيص البطارية", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("صيانة وقائية", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+    ("هيكل ودهان", ["vehicle", "vehicles", "fleet", "bus", "buses", "truck", "trucks", "مركبة", "مركبات", "سيارة", "سيارات", "أسطول", "حافلة", "حافلات", "شاحنة", "شاحنات"]),
+]
+
+_DEFAULT_EVS_EV_ANCHORS_EN = [
+    "ev",
+    "electric",
+    "electric vehicle",
+    "electric vehicles",
+    "electric fleet",
+    "electric bus",
+    "electric buses",
+    "electric truck",
+    "electric trucks",
+]
+
+_DEFAULT_EVS_EV_ANCHORS_AR = [
+    "كهربائي",
+    "كهربائية",
+    "مركبة كهربائية",
+    "مركبات كهربائية",
+    "المركبات الكهربائية",
+    "سيارة كهربائية",
+    "سيارات كهربائية",
+    "السيارات الكهربائية",
+    "أسطول كهربائي",
+    "حافلة كهربائية",
+    "حافلات كهربائية",
+    "شاحنة كهربائية",
+    "شاحنات كهربائية",
+]
+
+_DEFAULT_EVS_VEHICLE_ANCHORS_EN = [
+    "vehicle",
+    "vehicles",
+    "fleet",
+    "bus",
+    "buses",
+    "truck",
+    "trucks",
+]
+
+_DEFAULT_EVS_VEHICLE_ANCHORS_AR = [
+    "مركبة",
+    "مركبات",
+    "سيارة",
+    "سيارات",
+    "أسطول",
+    "حافلة",
+    "حافلات",
+    "شاحنة",
+    "شاحنات",
+]
+
+_DEFAULT_EVS_SUPPLY_NEGATIVE = [
+    "electrical materials",
+    "circuit breaker",
+    "circuit breakers",
+    "breaker panel",
+    "مواد كهربائية",
+    "قواطع",
+    "لوحات كهربائية",
 ]
 
 
@@ -177,10 +237,16 @@ if _yaml_data:
     CLIMATECH_KEYWORDS_AR  = _strip_comments(_yaml_data.get("climatech", {}).get("simple_ar", []))
     CLIMATECH_COMPOUND_EN  = _parse_compounds(_yaml_data.get("climatech", {}).get("compound_en", []))
     CLIMATECH_COMPOUND_AR  = _parse_compounds(_yaml_data.get("climatech", {}).get("compound_ar", []))
-    EVS_KEYWORDS_EN        = _strip_comments(_yaml_data.get("evs", {}).get("simple_en", []))
-    EVS_KEYWORDS_AR        = _strip_comments(_yaml_data.get("evs", {}).get("simple_ar", []))
-    EVS_COMPOUND_EN        = _parse_compounds(_yaml_data.get("evs", {}).get("compound_en", []))
-    EVS_COMPOUND_AR        = _parse_compounds(_yaml_data.get("evs", {}).get("compound_ar", []))
+    _evs_data             = _yaml_data.get("evs", {})
+    EVS_KEYWORDS_EN       = _strip_comments(_evs_data.get("simple_en", []))
+    EVS_KEYWORDS_AR       = _strip_comments(_evs_data.get("simple_ar", []))
+    EVS_COMPOUND_EN       = _parse_compounds(_evs_data.get("compound_en", []))
+    EVS_COMPOUND_AR       = _parse_compounds(_evs_data.get("compound_ar", []))
+    EVS_EV_ANCHORS_EN     = _strip_comments(_evs_data.get("ev_anchors_en", [])) or _DEFAULT_EVS_EV_ANCHORS_EN
+    EVS_EV_ANCHORS_AR     = _strip_comments(_evs_data.get("ev_anchors_ar", [])) or _DEFAULT_EVS_EV_ANCHORS_AR
+    EVS_VEHICLE_ANCHORS_EN = _strip_comments(_evs_data.get("vehicle_anchors_en", [])) or _DEFAULT_EVS_VEHICLE_ANCHORS_EN
+    EVS_VEHICLE_ANCHORS_AR = _strip_comments(_evs_data.get("vehicle_anchors_ar", [])) or _DEFAULT_EVS_VEHICLE_ANCHORS_AR
+    EVS_SUPPLY_NEGATIVE   = _strip_comments(_evs_data.get("supply_negative", [])) or _DEFAULT_EVS_SUPPLY_NEGATIVE
 else:
     NEGATIVE_KEYWORDS      = _DEFAULT_NEGATIVE
     CLIMATECH_KEYWORDS_EN  = _DEFAULT_CLIMATECH_EN
@@ -191,6 +257,11 @@ else:
     EVS_KEYWORDS_AR        = _DEFAULT_EVS_AR
     EVS_COMPOUND_EN        = _DEFAULT_EVS_COMPOUND_EN
     EVS_COMPOUND_AR        = _DEFAULT_EVS_COMPOUND_AR
+    EVS_EV_ANCHORS_EN      = _DEFAULT_EVS_EV_ANCHORS_EN
+    EVS_EV_ANCHORS_AR      = _DEFAULT_EVS_EV_ANCHORS_AR
+    EVS_VEHICLE_ANCHORS_EN = _DEFAULT_EVS_VEHICLE_ANCHORS_EN
+    EVS_VEHICLE_ANCHORS_AR = _DEFAULT_EVS_VEHICLE_ANCHORS_AR
+    EVS_SUPPLY_NEGATIVE    = _DEFAULT_EVS_SUPPLY_NEGATIVE
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +315,30 @@ def _check_compound(combined: str, compounds: list[tuple]) -> list[str]:
     return hits
 
 
+def _contains_any(text: str, keywords: list[str]) -> bool:
+    """Return True when any keyword/phrase is present in text."""
+    return any(_has_word(keyword, text) for keyword in keywords)
+
+
+def _check_evs_compound(combined: str, compounds: list[tuple]) -> list[str]:
+    """Return EVS compound hits only when EV and vehicle anchors both exist."""
+    hits = []
+    has_ev_anchor = _contains_any(combined, EVS_EV_ANCHORS_EN + EVS_EV_ANCHORS_AR)
+    has_vehicle_anchor = _contains_any(
+        combined,
+        EVS_VEHICLE_ANCHORS_EN + EVS_VEHICLE_ANCHORS_AR,
+    )
+
+    if not (has_ev_anchor and has_vehicle_anchor):
+        return hits
+
+    for kw, contexts in compounds:
+        if kw.lower() in combined or kw in combined:
+            if any(_has_word(ctx, combined) for ctx in contexts):
+                hits.append(kw)
+    return hits
+
+
 def match_tender(title: str, description: str = "") -> MatchResult:
     """
     Check if tender text matches any EV keywords.
@@ -265,8 +360,13 @@ def match_tender(title: str, description: str = "") -> MatchResult:
 
     evs_hits = (
         _check_simple(combined, EVS_KEYWORDS_EN + EVS_KEYWORDS_AR)
-        + _check_compound(combined, EVS_COMPOUND_EN + EVS_COMPOUND_AR)
+        + _check_evs_compound(combined, EVS_COMPOUND_EN + EVS_COMPOUND_AR)
     )
+
+    # Guard against generic electrical-supply tenders that happen to mention spare parts.
+    evs_vehicle_anchor = _contains_any(combined, EVS_VEHICLE_ANCHORS_EN + EVS_VEHICLE_ANCHORS_AR)
+    if evs_hits and _contains_any(combined, EVS_SUPPLY_NEGATIVE) and not evs_vehicle_anchor:
+        evs_hits = []
 
     climatech = bool(climatech_hits)
     evs = bool(evs_hits)
@@ -296,5 +396,3 @@ def match_tender(title: str, description: str = "") -> MatchResult:
         company=company,
         matched_keywords=matched_keywords,
     )
-
-
