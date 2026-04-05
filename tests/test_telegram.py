@@ -1,9 +1,24 @@
 """Quick test — sends a sample tender alert via Telegram to verify setup."""
 
 import asyncio
+from dataclasses import dataclass
+
 from dotenv import load_dotenv
-from utils.notifier import TenderRow
 from utils.telegram_notifier import send_telegram_alert
+
+
+@dataclass
+class TenderRow:
+    site: str
+    title: str
+    ref_number: str
+    publish_date: str
+    close_date: str
+    days_left: int | None
+    link: str
+    company_match: str
+    matched_keywords: str
+    description: str
 
 load_dotenv()
 
@@ -42,4 +57,5 @@ async def main():
     else:
         print("FAILED. Check that TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set correctly in .env")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

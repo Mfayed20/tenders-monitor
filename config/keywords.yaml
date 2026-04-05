@@ -137,60 +137,115 @@ evs:
     - ورشة مركبات كهربائية         # EV workshop
     - قطع غيار المركبات الكهربائية  # EV spare parts
 
+  ev_anchors_en:
+    - ev
+    - electric
+    - electric vehicle
+    - electric vehicles
+    - electric fleet
+    - electric bus
+    - electric buses
+    - electric truck
+    - electric trucks
+
+  ev_anchors_ar:
+    - كهربائي
+    - كهربائية
+    - مركبة كهربائية
+    - مركبات كهربائية
+    - المركبات الكهربائية
+    - سيارة كهربائية
+    - سيارات كهربائية
+    - السيارات الكهربائية
+    - أسطول كهربائي
+    - حافلة كهربائية
+    - حافلات كهربائية
+    - شاحنة كهربائية
+    - شاحنات كهربائية
+
+  vehicle_anchors_en:
+    - vehicle
+    - vehicles
+    - fleet
+    - bus
+    - buses
+    - truck
+    - trucks
+
+  vehicle_anchors_ar:
+    - مركبة
+    - مركبات
+    - سيارة
+    - سيارات
+    - أسطول
+    - حافلة
+    - حافلات
+    - شاحنة
+    - شاحنات
+
+  supply_negative:
+    - electrical materials
+    - circuit breaker
+    - circuit breakers
+    - breaker panel
+    - مواد كهربائية
+    - قواطع
+    - لوحات كهربائية
+
   compound_en:
     # Existing — already properly scoped
     - keyword: body shop
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: bodywork
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: spare parts
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: workshop
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: service center
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: vehicle inspection
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: inverter
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: vehicle repair
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     # Moved from simple — too generic without EV context
     - keyword: fleet maintenance
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: fleet management
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: collision repair
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: battery repair
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: battery diagnostics
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: powertrain repair
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: periodic servicing
-      context: [ev, electric, كهربائ]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: preventive maintenance
-      context: [ev, electric, fleet, كهربائ, أسطول]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
 
   compound_ar:
     # Existing
     - keyword: ورشة                  # workshop
-      context: [كهربائ, ev, electric]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: قطع غيار              # spare parts
-      context: [كهربائ, ev, electric]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: فحص مركبات            # vehicle inspection
-      context: [كهربائ, ev, electric]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     # Moved from simple — too generic without EV context
     - keyword: صيانة الأسطول          # fleet maintenance
-      context: [كهربائ, ev, electric]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: إدارة الأسطول          # fleet management
-      context: [كهربائ, ev, electric]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: إصلاح البطارية         # battery repair
-      context: [كهربائ, ev, electric, مركبة]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: تشخيص البطارية         # battery diagnostics
-      context: [كهربائ, ev, electric, مركبة]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: صيانة وقائية           # preventive maintenance
-      context: [كهربائ, ev, electric, أسطول]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: هيكل ودهان             # body & paint
-      context: [كهربائ, ev, electric, مركبة]
+      context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
