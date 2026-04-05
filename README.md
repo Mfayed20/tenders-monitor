@@ -1,6 +1,6 @@
 # KSA EV Tender Monitor
 
-A daily scraper that monitors Saudi Arabia tender websites for EV-related opportunities, filters results by keyword, and sends HTML email alerts.
+A daily scraper that monitors Saudi Arabia tender websites for EV-related opportunities, filters results by keyword, and sends Telegram alerts.
 
 Built for two companies:
 - **Climatech Charger** — EV chargers, installation, infrastructure, CPO
@@ -10,9 +10,10 @@ Built for two companies:
 
 1. Scrapes 6 tender sources concurrently (HTTP-based) or via headless browser (JS-heavy sites)
 2. Filters tenders by EV keywords in English and Arabic
-3. Deduplicates against previously seen tenders (SQLite)
-4. Writes results to a daily CSV and a cumulative master CSV
-5. Sends an HTML email digest to configured recipients
+3. Uses high-precision EVS matching so generic electrical supply tenders do not trigger EVS alerts
+4. Deduplicates against previously seen tenders (SQLite)
+5. Writes results to a daily CSV and a cumulative master CSV
+6. Sends a Telegram digest to the configured chat, even when no new matches are found
 
 ## Sources
 
@@ -42,26 +43,46 @@ playwright install chromium
 cp .env.example .env
 ```
 
-Edit `.env` with your Gmail credentials and recipient emails:
+Edit `.env` with your Telegram bot details:
 ```env
-GMAIL_USER=your-email@gmail.com
-GMAIL_APP_PASSWORD=your-app-password
-NOTIFY_EMAILS=recipient1@example.com,recipient2@example.com
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHAT_ID=your-chat-id
 ```
 
-> Use a [Gmail App Password](https://myaccount.google.com/apppasswords), not your real password.
+To get these values:
+1. Create a bot with `@BotFather` and copy the bot token
+2. Send a message to the bot
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy your `chat_id`
 
 ## Usage
 
 ```bash
-# Full run: scrape + filter + email
+# Full run: scrape + filter + CSV + Telegram
 python main.py
-
-# Scrape and save CSV only (no email)
-python main.py --no-email
 
 # Purge dedup records older than 90 days
 python main.py --purge
+```
+
+## Matching Rules
+
+- `Climatech Charger` focuses on EV charging, installation, and charging infrastructure tenders.
+- `EVS` focuses on EV fleet and vehicle service work such as maintenance, repair, diagnostics, workshops, and spare parts.
+- EVS matching is intentionally strict: generic electrical-material tenders like `مواد كهربائية`, `قواطع`, or non-vehicle spare-parts procurement should not alert.
+- Keyword rules are maintained in `config/keywords.yaml`, with matcher logic in `utils/keywords.py`.
+
+## Testing
+
+Install `pytest` in the virtual environment if needed:
+
+```bash
+python -m pip install pytest
+```
+
+Run the regression tests:
+
+```bash
+python -m pytest -q
 ```
 
 ## Output
@@ -94,7 +115,7 @@ tenders-monitor/
     ├── dates.py             # Date parsing and filtering
     ├── dedup.py             # SQLite deduplication
     ├── keywords.py          # EV keyword matching (EN + AR)
-    └── notifier.py          # HTML email builder and sender
+    └── telegram_notifier.py # Telegram digest sender
 ```
 
 ## Automating Daily Runs
