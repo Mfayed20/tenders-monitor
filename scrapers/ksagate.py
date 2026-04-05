@@ -87,11 +87,12 @@ class KSAGateScraper(BaseScraper):
             return None
 
         link = item.get("link", "")
-        publish_date = parse_date(item.get("date", ""))
+        publish_date_raw = str(item.get("date", "")).strip()
+        publish_date = parse_date(publish_date_raw)
 
         # Parse the HTML content for structured fields
         content_html = item.get("content", {}).get("rendered", "")
-        ref_number, close_date, description = self._parse_content(content_html)
+        ref_number, close_date, close_date_raw, description = self._parse_content(content_html)
 
         return Tender(
             site=self.SITE_NAME,
@@ -99,19 +100,22 @@ class KSAGateScraper(BaseScraper):
             ref_number=ref_number,
             publish_date=publish_date,
             close_date=close_date,
+            publish_date_raw=publish_date_raw,
+            close_date_raw=close_date_raw,
             link=link,
             description=description,
         )
 
-    def _parse_content(self, html: str) -> tuple[str, ..., str]:
+    def _parse_content(self, html: str) -> tuple[str, object, str, str]:
         """Extract ref number, close date, and description from content HTML tables."""
         if not html:
-            return "", None, ""
+            return "", None, "", ""
 
         soup = BeautifulSoup(html, "lxml")
         ref_number = ""
         close_date = None
-        description = ""
+        close_date_raw = ""
+        description_parts: list[str] = []
 
         rows = soup.select("tr")
         for row in rows:
@@ -125,8 +129,16 @@ class KSAGateScraper(BaseScraper):
             if "tenderid" in label or "tender no" in label:
                 ref_number = ref_number or value
             elif "last date" in label or "bid submission" in label or "closing" in label:
+                close_date_raw = close_date_raw or value
                 close_date = close_date or parse_date(value)
-            elif "tender brief" in label or "work detail" in label:
-                description = description or value[:500]
+            elif (
+                "tender brief" in label
+                or "work detail" in label
+                or "scope" in label
+                or "sector" in label
+            ):
+                if value:
+                    description_parts.append(value)
 
-        return ref_number, close_date, description
+        description = " | ".join(dict.fromkeys(description_parts))[:500]
+        return ref_number, close_date, close_date_raw, description

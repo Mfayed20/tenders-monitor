@@ -9,10 +9,10 @@ Built for two companies:
 ## How It Works
 
 1. Scrapes 6 tender sources concurrently (HTTP-based) or via headless browser (JS-heavy sites)
-2. Filters tenders by EV keywords in English and Arabic
-3. Uses high-precision EVS matching so generic electrical supply tenders do not trigger EVS alerts
+2. Filters tenders by precision-first EV business rules in English and Arabic
+3. Uses company-specific matching for Climatech Charger and EVS so generic electrical, software, and non-EV supply tenders do not trigger alerts
 4. Deduplicates against previously seen tenders (SQLite)
-5. Writes results to a daily CSV and a cumulative master CSV
+5. Writes results to a latest-run daily snapshot CSV and a cumulative master CSV
 6. Sends a Telegram digest to the configured chat, even when no new matches are found
 
 ## Sources
@@ -67,8 +67,8 @@ python main.py --purge
 ## Matching Rules
 
 - `Climatech Charger` focuses on EV charging, installation, and charging infrastructure tenders.
-- `EVS` focuses on EV fleet and vehicle service work such as maintenance, repair, diagnostics, workshops, and spare parts.
-- EVS matching is intentionally strict: generic electrical-material tenders like `مواد كهربائية`, `قواطع`, or non-vehicle spare-parts procurement should not alert.
+- `EVS` focuses on EV fleet and vehicle service work such as maintenance, repair, diagnostics, firmware, battery-module work, workshops, bodywork, and spare parts.
+- Matching is intentionally strict: generic electrical-material tenders like `مواد كهربائية`, `قواطع`, generic software-development work, and non-EV energy-storage infrastructure should not alert.
 - Keyword rules are maintained in `config/keywords.yaml`, with matcher logic in `utils/keywords.py`.
 
 ## Testing
@@ -91,7 +91,7 @@ All output is saved to the `output/` directory (gitignored):
 
 | File | Description |
 |---|---|
-| `tenders_YYYY-MM-DD.csv` | Daily matched tenders |
+| `tenders_YYYY-MM-DD.csv` | Latest-run daily snapshot of matched tenders |
 | `all_tenders.csv` | Cumulative master CSV |
 | `seen_tenders.db` | SQLite dedup database |
 | `tender_monitor.log` | Run logs |

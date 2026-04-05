@@ -93,21 +93,25 @@ class TendersaScraper(BaseScraper):
 
         # Publish date — inside .take-off div
         publish_date = None
+        publish_date_raw = ""
         takeoff = wrapper.select_one(".take-off")
         if takeoff:
             text = takeoff.get_text()
             date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
             if date_match:
-                publish_date = parse_date(date_match.group(1))
+                publish_date_raw = date_match.group(1)
+                publish_date = parse_date(publish_date_raw)
 
         # Close date — inside .landing div
         close_date = None
+        close_date_raw = ""
         landing = wrapper.select_one(".landing")
         if landing:
             text = landing.get_text()
             date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
             if date_match:
-                close_date = parse_date(date_match.group(1))
+                close_date_raw = date_match.group(1)
+                close_date = parse_date(close_date_raw)
 
         # Ref ID
         ref_el = wrapper.select_one("span[id*='lblTenderJoID']")
@@ -123,5 +127,7 @@ class TendersaScraper(BaseScraper):
             ref_number=ref_number,
             publish_date=publish_date,
             close_date=close_date,
+            publish_date_raw=publish_date_raw,
+            close_date_raw=close_date_raw,
             link=link,
         )

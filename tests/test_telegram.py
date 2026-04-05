@@ -1,10 +1,6 @@
-"""Quick test — sends a sample tender alert via Telegram to verify setup."""
-
-import asyncio
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
-from utils.telegram_notifier import send_telegram_alert
+from utils.telegram_notifier import _build_messages
 
 
 @dataclass
@@ -20,42 +16,25 @@ class TenderRow:
     matched_keywords: str
     description: str
 
-load_dotenv()
-
-SAMPLE_TENDERS = [
-    TenderRow(
-        site="Etimad",
-        title="Supply and Installation of EV Charging Stations - Riyadh",
-        ref_number="ETM-2025-001",
-        publish_date="29 Mar 2025",
-        close_date="10 Apr 2025",
-        days_left=12,
-        link="https://etimad.sa",
-        company_match="Climatech",
-        matched_keywords="ev charging, charging station",
-        description="Supply, installation and commissioning of EV chargers across 5 locations.",
-    ),
-    TenderRow(
-        site="KSAGate",
-        title="Electric Fleet Maintenance Contract - Jeddah",
-        ref_number="KSA-2025-042",
-        publish_date="28 Mar 2025",
-        close_date="02 Apr 2025",
-        days_left=4,
-        link="https://ksatendersgate.com",
+def test_build_messages_escapes_html_and_includes_scope():
+    tender = TenderRow(
+        site="EVS & Co",
+        title="EV <Repair> & Firmware Update",
+        ref_number="REF_[1]",
+        publish_date="2026-04-05",
+        close_date="2026-04-10",
+        days_left=5,
+        link="https://example.com/tender?x=1&y=2",
         company_match="EVS",
-        matched_keywords="fleet maintenance, ev fleet",
-        description="Annual maintenance contract for 80-vehicle electric fleet.",
-    ),
-]
+        matched_keywords="firmware, battery module",
+        description="Mixed English & Arabic scope <upgrade> for عربي fleet diagnostics.",
+    )
 
-async def main():
-    print("Sending test Telegram alert...")
-    ok = await send_telegram_alert(SAMPLE_TENDERS, "2025-03-29")
-    if ok:
-        print("SUCCESS! Check your Telegram - you should have received a message.")
-    else:
-        print("FAILED. Check that TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set correctly in .env")
+    message = _build_messages([tender], "2026-04-05")[0]
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    assert "<Repair>" not in message
+    assert "&lt;Repair&gt;" in message
+    assert "EVS &amp; Co" in message
+    assert "Scope:" in message
+    assert "عربي" in message
+    assert 'href="https://example.com/tender?x=1&amp;y=2"' in message

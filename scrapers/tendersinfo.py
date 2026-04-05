@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Tender
 from utils.dates import parse_date
+from utils.keywords import TENDERSINFO_QUERIES
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +26,7 @@ class TendersInfoScraper(BaseScraper):
     NEEDS_BROWSER = False
 
     # Search terms — the /location endpoint already filters to Saudi Arabia
-    SEARCH_QUERIES = [
-        "Saudi Arabia",
-        "electric vehicle",
-        "charging station",
-    ]
+    SEARCH_QUERIES = TENDERSINFO_QUERIES
     PAGE_SIZE = 50
 
     async def scrape(self, browser=None) -> list[Tender]:
@@ -125,14 +122,22 @@ class TendersInfoScraper(BaseScraper):
         if url and not url.startswith("http"):
             url = f"{self.BASE_URL}/{url.lstrip('/')}"
 
+        description_parts = [
+            self._strip_html(record.get("tender_sector", "")),
+            self._strip_html(record.get("region_name", "")),
+        ]
+        description = " | ".join(part for part in description_parts if part)
+
         return Tender(
             site=self.SITE_NAME,
             title=title,
             ref_number=ref_number,
             publish_date=parse_date(publish_date_str),
             close_date=parse_date(close_date_str),
+            publish_date_raw=publish_date_str,
+            close_date_raw=close_date_str,
             link=url,
-            description=self._strip_html(record.get("tender_sector", "")),
+            description=description[:500],
         )
 
     @staticmethod

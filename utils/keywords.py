@@ -167,6 +167,37 @@ _DEFAULT_EVS_VEHICLE_ANCHORS_AR = [
     "شاحنات",
 ]
 
+_DEFAULT_EVS_SERVICE_ANCHORS_EN = [
+    "service",
+    "maintenance",
+    "repair",
+    "diagnostics",
+    "diagnostic",
+    "battery",
+    "module",
+    "workshop",
+    "aftersales",
+    "body shop",
+    "bodywork",
+    "collision",
+    "spare parts",
+    "warranty",
+]
+
+_DEFAULT_EVS_SERVICE_ANCHORS_AR = [
+    "خدمة",
+    "صيانة",
+    "إصلاح",
+    "تشخيص",
+    "بطارية",
+    "وحدة",
+    "ورشة",
+    "هيكل",
+    "دهان",
+    "قطع غيار",
+    "ضمان",
+]
+
 _DEFAULT_EVS_SUPPLY_NEGATIVE = [
     "electrical materials",
     "circuit breaker",
@@ -175,6 +206,17 @@ _DEFAULT_EVS_SUPPLY_NEGATIVE = [
     "مواد كهربائية",
     "قواطع",
     "لوحات كهربائية",
+]
+
+_DEFAULT_TENDERSINFO_QUERIES = [
+    "ev charging station",
+    "charge point operator",
+    "charge point management system",
+    "charging network",
+    "electric vehicle maintenance",
+    "electric bus maintenance",
+    "electric truck maintenance",
+    "ev battery diagnostics",
 ]
 
 
@@ -246,7 +288,11 @@ if _yaml_data:
     EVS_EV_ANCHORS_AR     = _strip_comments(_evs_data.get("ev_anchors_ar", [])) or _DEFAULT_EVS_EV_ANCHORS_AR
     EVS_VEHICLE_ANCHORS_EN = _strip_comments(_evs_data.get("vehicle_anchors_en", [])) or _DEFAULT_EVS_VEHICLE_ANCHORS_EN
     EVS_VEHICLE_ANCHORS_AR = _strip_comments(_evs_data.get("vehicle_anchors_ar", [])) or _DEFAULT_EVS_VEHICLE_ANCHORS_AR
+    EVS_SERVICE_ANCHORS_EN = _strip_comments(_evs_data.get("service_anchors_en", [])) or _DEFAULT_EVS_SERVICE_ANCHORS_EN
+    EVS_SERVICE_ANCHORS_AR = _strip_comments(_evs_data.get("service_anchors_ar", [])) or _DEFAULT_EVS_SERVICE_ANCHORS_AR
     EVS_SUPPLY_NEGATIVE   = _strip_comments(_evs_data.get("supply_negative", [])) or _DEFAULT_EVS_SUPPLY_NEGATIVE
+    _sources_data         = _yaml_data.get("sources", {})
+    TENDERSINFO_QUERIES   = _strip_comments(_sources_data.get("tendersinfo_queries", [])) or _DEFAULT_TENDERSINFO_QUERIES
 else:
     NEGATIVE_KEYWORDS      = _DEFAULT_NEGATIVE
     CLIMATECH_KEYWORDS_EN  = _DEFAULT_CLIMATECH_EN
@@ -261,7 +307,10 @@ else:
     EVS_EV_ANCHORS_AR      = _DEFAULT_EVS_EV_ANCHORS_AR
     EVS_VEHICLE_ANCHORS_EN = _DEFAULT_EVS_VEHICLE_ANCHORS_EN
     EVS_VEHICLE_ANCHORS_AR = _DEFAULT_EVS_VEHICLE_ANCHORS_AR
+    EVS_SERVICE_ANCHORS_EN = _DEFAULT_EVS_SERVICE_ANCHORS_EN
+    EVS_SERVICE_ANCHORS_AR = _DEFAULT_EVS_SERVICE_ANCHORS_AR
     EVS_SUPPLY_NEGATIVE    = _DEFAULT_EVS_SUPPLY_NEGATIVE
+    TENDERSINFO_QUERIES    = _DEFAULT_TENDERSINFO_QUERIES
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +322,7 @@ class MatchResult:
     matched: bool
     company: str  # "Climatech", "EVS", "Both", or ""
     matched_keywords: list[str]
+    reject_reason: str = ""
 
 
 def _normalize(text: str) -> str:
@@ -284,7 +334,7 @@ def _check_simple(combined: str, keywords: list[str]) -> list[str]:
     """Return list of simple keywords found in combined text."""
     hits = []
     for kw in keywords:
-        if kw.lower() in combined or kw in combined:
+        if _has_word(kw, combined):
             hits.append(kw)
     return hits
 
@@ -309,7 +359,7 @@ def _check_compound(combined: str, compounds: list[tuple]) -> list[str]:
     """
     hits = []
     for kw, contexts in compounds:
-        if kw.lower() in combined or kw in combined:
+        if _has_word(kw, combined):
             if any(_has_word(ctx, combined) for ctx in contexts):
                 hits.append(kw)
     return hits
@@ -321,19 +371,22 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
 
 
 def _check_evs_compound(combined: str, compounds: list[tuple]) -> list[str]:
-    """Return EVS compound hits only when EV and vehicle anchors both exist."""
+    """Return EVS compound hits only when EV and service scope anchors both exist."""
     hits = []
     has_ev_anchor = _contains_any(combined, EVS_EV_ANCHORS_EN + EVS_EV_ANCHORS_AR)
-    has_vehicle_anchor = _contains_any(
+    has_scope_anchor = _contains_any(
         combined,
-        EVS_VEHICLE_ANCHORS_EN + EVS_VEHICLE_ANCHORS_AR,
+        EVS_VEHICLE_ANCHORS_EN
+        + EVS_VEHICLE_ANCHORS_AR
+        + EVS_SERVICE_ANCHORS_EN
+        + EVS_SERVICE_ANCHORS_AR,
     )
 
-    if not (has_ev_anchor and has_vehicle_anchor):
+    if not (has_ev_anchor and has_scope_anchor):
         return hits
 
     for kw, contexts in compounds:
-        if kw.lower() in combined or kw in combined:
+        if _has_word(kw, combined):
             if any(_has_word(ctx, combined) for ctx in contexts):
                 hits.append(kw)
     return hits
@@ -365,20 +418,31 @@ def match_tender(title: str, description: str = "") -> MatchResult:
 
     # Guard against generic electrical-supply tenders that happen to mention spare parts.
     evs_vehicle_anchor = _contains_any(combined, EVS_VEHICLE_ANCHORS_EN + EVS_VEHICLE_ANCHORS_AR)
+    evs_reject_reason = ""
     if evs_hits and _contains_any(combined, EVS_SUPPLY_NEGATIVE) and not evs_vehicle_anchor:
         evs_hits = []
+        evs_reject_reason = "evs_supply_negative"
 
     climatech = bool(climatech_hits)
     evs = bool(evs_hits)
     matched_keywords = climatech_hits + evs_hits
 
     if not (climatech or evs):
-        return MatchResult(matched=False, company="", matched_keywords=[])
+        return MatchResult(
+            matched=False,
+            company="",
+            matched_keywords=[],
+            reject_reason=evs_reject_reason or "no_business_match",
+        )
 
     # --- Layer 3: Negative keyword rejection ---
-    for neg in NEGATIVE_KEYWORDS:
-        if neg.lower() in combined:
-            return MatchResult(matched=False, company="", matched_keywords=[])
+    if _contains_any(combined, NEGATIVE_KEYWORDS):
+        return MatchResult(
+            matched=False,
+            company="",
+            matched_keywords=[],
+            reject_reason="shared_negative",
+        )
 
     # --- Determine company ---
     if climatech and evs:
@@ -395,4 +459,5 @@ def match_tender(title: str, description: str = "") -> MatchResult:
         matched=True,
         company=company,
         matched_keywords=matched_keywords,
+        reject_reason="",
     )

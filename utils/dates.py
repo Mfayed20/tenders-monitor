@@ -26,6 +26,10 @@ ARABIC_NUMERALS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 # KSA timezone (AST = UTC+3)
 KSA_TZ = timezone(timedelta(hours=3))
 
+_AMBIGUOUS_NUMERIC_DATE_RE = re.compile(
+    r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\s*$"
+)
+
 
 def _transliterate_arabic(text: str) -> str:
     """Convert Arabic numerals and month names to English equivalents."""
@@ -33,6 +37,22 @@ def _transliterate_arabic(text: str) -> str:
     for ar, en in ARABIC_MONTHS.items():
         text = text.replace(ar, en)
     return text
+
+
+def has_date_text(raw_date: str | None) -> bool:
+    """Return True when the source exposed a non-empty date string."""
+    return bool(raw_date and raw_date.strip())
+
+
+def _is_ambiguous_numeric_date(text: str) -> bool:
+    """Reject purely numeric dates when day/month ordering is ambiguous."""
+    match = _AMBIGUOUS_NUMERIC_DATE_RE.match(text)
+    if not match:
+        return False
+
+    first = int(match.group(1))
+    second = int(match.group(2))
+    return first <= 12 and second <= 12
 
 
 def parse_date(date_str: str) -> datetime | None:
@@ -45,7 +65,7 @@ def parse_date(date_str: str) -> datetime | None:
 
     cleaned = _transliterate_arabic(date_str.strip())
     # Remove common prefixes/suffixes
-    cleaned = re.sub(r"(هـ|ه|م|AM|PM|ص|م\.)", "", cleaned).strip()
+    cleaned = re.sub(r"(هـ|ه|م|AM|PM|ص|م\.)", "", cleaned, flags=re.IGNORECASE).strip()
     # Remove day names
     cleaned = re.sub(
         r"(الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)",
@@ -53,6 +73,17 @@ def parse_date(date_str: str) -> datetime | None:
     ).strip()
     # Collapse separators
     cleaned = re.sub(r"\s+", " ", cleaned)
+
+    if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2})?$", cleaned):
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M"):
+            try:
+                dt = datetime.strptime(cleaned, fmt)
+                return dt.replace(tzinfo=KSA_TZ)
+            except ValueError:
+                continue
+
+    if _is_ambiguous_numeric_date(cleaned):
+        return None
 
     try:
         dt = dateutil_parser.parse(cleaned, dayfirst=True)
@@ -82,7 +113,8 @@ def is_new_tender(publish_date: datetime | None, hours: int = 24) -> bool:
     if publish_date is None:
         return True  # Include if we can't determine date (conservative)
     now = datetime.now(KSA_TZ)
-    return (now - publish_date) <= timedelta(hours=hours)
+    age = now - publish_date
+    return timedelta(0) <= age <= timedelta(hours=hours)
 
 
 def is_closing_soon(close_date: datetime | None, days: int = 30) -> bool:

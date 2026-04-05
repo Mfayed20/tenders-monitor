@@ -20,7 +20,8 @@ import html
 import logging
 import re
 import sys
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -34,7 +35,7 @@ from scrapers.metenders import METendersScraper
 from scrapers.tendersontime import TendersOnTimeScraper
 from scrapers.base import Tender
 from utils.keywords import match_tender
-from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ
+from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ, has_date_text
 from utils.dedup import is_seen, mark_seen, purge_old
 from utils.telegram_notifier import send_telegram_alert
 
@@ -50,6 +51,16 @@ class TenderRow:
     company_match: str
     matched_keywords: str  # comma-separated keywords that triggered the match
     description: str  # tender description/scope (truncated)
+
+
+@dataclass
+class FilterDiagnostics:
+    raw_total: int = 0
+    matched_total: int = 0
+    reject_counts: dict[str, Counter[str]] = field(default_factory=dict)
+
+    def record_reject(self, site: str, reason: str) -> None:
+        self.reject_counts.setdefault(site, Counter())[reason] += 1
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +81,13 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger("main")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+CSV_HEADER = [
+    "Site", "Title", "Ref#", "Published", "Deadline",
+    "Days Left", "Link", "Match (Company)", "Keywords", "Description",
+]
 
 # All scrapers to run
 SCRAPERS = [
@@ -154,7 +172,25 @@ def _clean_title(raw: str, max_len: int = 120) -> str:
     return text
 
 
-def filter_tenders(tenders: list[Tender]) -> list[TenderRow]:
+def _log_filter_diagnostics(diagnostics: FilterDiagnostics) -> None:
+    rejected_total = sum(sum(counter.values()) for counter in diagnostics.reject_counts.values())
+    logger.info(
+        "Filtering diagnostics: raw=%d matched=%d rejected=%d",
+        diagnostics.raw_total,
+        diagnostics.matched_total,
+        rejected_total,
+    )
+
+    for site in sorted(diagnostics.reject_counts):
+        summary = ", ".join(
+            f"{reason}={count}"
+            for reason, count in diagnostics.reject_counts[site].most_common(3)
+        )
+        if summary:
+            logger.info("Reject summary [%s]: %s", site, summary)
+
+
+def filter_tenders(tenders: list[Tender]) -> tuple[list[TenderRow], FilterDiagnostics]:
     """
     Filter tenders by:
     1. EV keyword match (English + Arabic)
@@ -164,22 +200,41 @@ def filter_tenders(tenders: list[Tender]) -> list[TenderRow]:
     4. Not previously seen (dedup)
     """
     matched = []
+    diagnostics = FilterDiagnostics(raw_total=len(tenders))
+    now = datetime.now(KSA_TZ)
 
     for t in tenders:
         # Keyword match
         result = match_tender(t.title, t.description)
         if not result.matched:
+            diagnostics.record_reject(t.site, result.reject_reason or "no_business_match")
             continue
 
-        # Time filters (conservative: include if dates unknown)
+        # Time filters (conservative only when the source exposes no date at all)
+        if t.publish_date is None and has_date_text(t.publish_date_raw):
+            diagnostics.record_reject(t.site, "unparsed_publish_date")
+            continue
+        if t.close_date is None and has_date_text(t.close_date_raw):
+            diagnostics.record_reject(t.site, "unparsed_close_date")
+            continue
+
+        if t.publish_date and t.publish_date > now:
+            diagnostics.record_reject(t.site, "future_publish_date")
+            continue
         if not is_new_tender(t.publish_date, hours=168):  # 7 days
+            diagnostics.record_reject(t.site, "publish_window")
+            continue
+        if t.close_date and t.close_date < now:
+            diagnostics.record_reject(t.site, "already_closed")
             continue
         if not is_closing_soon(t.close_date):
+            diagnostics.record_reject(t.site, "close_window")
             continue
 
         # Dedup
         if is_seen(t.site, t.title, t.ref_number):
             logger.debug("Already seen: %s — %s", t.site, t.title[:50])
+            diagnostics.record_reject(t.site, "dedup")
             continue
 
         # Mark as seen
@@ -188,7 +243,7 @@ def filter_tenders(tenders: list[Tender]) -> list[TenderRow]:
         # Calculate days until closing
         days_left = None
         if t.close_date:
-            delta = t.close_date - datetime.now(KSA_TZ)
+            delta = t.close_date - now
             days_left = max(0, delta.days)
 
         matched.append(TenderRow(
@@ -204,21 +259,13 @@ def filter_tenders(tenders: list[Tender]) -> list[TenderRow]:
             description=t.description[:200] if t.description else "",
         ))
 
-    return matched
+    diagnostics.matched_total = len(matched)
+    return matched, diagnostics
 
 
 def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
-    """Write matched tenders to a daily CSV (append) and a master CSV (cumulative)."""
+    """Write a daily snapshot CSV and append non-empty runs to the master CSV."""
     csv_path = LOG_DIR / f"tenders_{date_str}.csv"
-
-    if not tenders:
-        logger.info("No matches — skipping CSV write")
-        return csv_path
-
-    HEADER = [
-        "Site", "Title", "Ref#", "Published", "Deadline",
-        "Days Left", "Link", "Match (Company)", "Keywords", "Description",
-    ]
 
     def _to_row(t):
         return [
@@ -228,14 +275,16 @@ def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
             t.link, t.company_match, t.matched_keywords, t.description,
         ]
 
-    # 1. Daily CSV (append — preserves results from earlier runs the same day)
-    write_header = not csv_path.exists()
-    with open(csv_path, "a", newline="", encoding="utf-8-sig") as f:
+    # 1. Daily CSV snapshot (overwrite on each run to avoid stale same-day rows)
+    with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        if write_header:
-            writer.writerow(HEADER)
+        writer.writerow(CSV_HEADER)
         for t in tenders:
             writer.writerow(_to_row(t))
+
+    if not tenders:
+        logger.info("Daily CSV snapshot written: %s (0 rows)", csv_path.name)
+        return csv_path
 
     # 2. Master CSV (cumulative — all matches ever found)
     master_path = LOG_DIR / "all_tenders.csv"
@@ -243,7 +292,7 @@ def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
     with open(master_path, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         if write_master_header:
-            writer.writerow(HEADER)
+            writer.writerow(CSV_HEADER)
         for t in tenders:
             writer.writerow(_to_row(t))
 
@@ -281,8 +330,9 @@ async def main():
 
     # Step 2: Filter by keywords, dates, dedup
     logger.info("Step 2: Filtering tenders...")
-    matched = filter_tenders(all_tenders)
+    matched, diagnostics = filter_tenders(all_tenders)
     logger.info("Matched tenders after filtering: %d", len(matched))
+    _log_filter_diagnostics(diagnostics)
 
     # Step 3: Write CSV (always, even if empty — for audit trail)
     csv_path = write_csv(matched, date_str)

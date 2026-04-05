@@ -27,6 +27,8 @@ class Tender:
     ref_number: str
     publish_date: datetime | None = None
     close_date: datetime | None = None
+    publish_date_raw: str = ""
+    close_date_raw: str = ""
     link: str = ""
     description: str = ""
     raw_data: dict = field(default_factory=dict)

@@ -117,6 +117,8 @@ class EtimadScraper(BaseScraper):
                 ref_number=tender_id[:20],
                 publish_date=tender_data.get("publish_date"),
                 close_date=tender_data.get("close_date"),
+                publish_date_raw=tender_data.get("publish_date_raw", ""),
+                close_date_raw=tender_data.get("close_date_raw", ""),
                 link=link,
             ))
 
@@ -124,7 +126,12 @@ class EtimadScraper(BaseScraper):
 
     def _extract_context(self, soup: BeautifulSoup, href: str) -> dict:
         """Try to extract dates from the DOM near a tender link."""
-        result = {"publish_date": None, "close_date": None}
+        result = {
+            "publish_date": None,
+            "close_date": None,
+            "publish_date_raw": "",
+            "close_date_raw": "",
+        }
 
         # Find the link element
         link_el = soup.select_one(f'a[href="{href}"]')
@@ -144,10 +151,13 @@ class EtimadScraper(BaseScraper):
             if dates:
                 for i, d in enumerate(dates[:2]):
                     parsed = parse_date(d)
-                    if parsed:
-                        if i == 0 and not result["publish_date"]:
+                    if i == 0:
+                        result["publish_date_raw"] = result["publish_date_raw"] or d
+                        if parsed and not result["publish_date"]:
                             result["publish_date"] = parsed
-                        elif i == 1 and not result["close_date"]:
+                    elif i == 1:
+                        result["close_date_raw"] = result["close_date_raw"] or d
+                        if parsed and not result["close_date"]:
                             result["close_date"] = parsed
                 if result["publish_date"] or result["close_date"]:
                     break

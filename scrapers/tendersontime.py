@@ -113,6 +113,7 @@ class TendersOnTimeScraper(BaseScraper):
             ref_number=ref_number,
             publish_date=None,
             close_date=parse_date(close_date_str) if close_date_str else None,
+            close_date_raw=close_date_str,
             link=url,
             description=str(record.get("Description", "")),
         )

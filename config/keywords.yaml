@@ -27,6 +27,17 @@ negative:
   - phone charger
   - laptop charger
   - ups battery
+  - street lighting
+  - road lighting
+  - traffic signal
+  - substation
+  - transformer
+  - cable laying
+  - data center
+  - website development
+  - mobile application development
+  - battery energy storage
+  - energy storage system
 
 # ---------------------------------------------------------------------------
 # Climatech Charger — chargers, installation, infrastructure, CPO
@@ -37,27 +48,34 @@ climatech:
     - ev charging
     - ev charger
     - electric vehicle charging
+    - electric vehicle charging infrastructure
     - charger installation
     - charging station
     - charging infrastructure
+    - ac dc charging station
     - dc fast charger
     - ac charger
     - level 2 charger
     - charging point
     - charging equipment
     - charging network
+    - charging networks
     - smart charging
     - supercharger
     # Operator / management
     - cpo
     - charge point operator
+    - cpo services
+    - cpo operations
     - cpms
     - charge point management
+    - charge point management system
     - ocpp
     - ocpi
     # Regulation
     - sec certified
     - sec certification
+    - regulatory approvals
     # Maintenance of chargers
     - charger maintenance
     # Broader
@@ -70,12 +88,14 @@ climatech:
     - شاحن سيارات كهربائية         # EV charger
     - شاحن كهربائي                 # electric charger
     - محطة شحن                     # charging station
+    - محطات شحن سيارات كهربائية     # EV charging stations
     - تركيب شاحن                   # charger installation
     - بنية تحتية للشحن             # charging infrastructure
     - المشغل المسؤول عن الشحن      # CPO
     - نقطة شحن                     # charging point
     - شاحن سريع                    # fast charger
     - شبكة شحن                     # charging network
+    - شبكات شحن                    # charging networks
     - الشحن الذكي                  # smart charging
     - إدارة نقاط الشحن             # charge point management
     - تشغيل نقاط الشحن             # charge point operation
@@ -90,6 +110,26 @@ climatech:
       context: [charger, ev, charging, شحن]
     - keyword: site preparation
       context: [charger, ev, charging, شحن]
+    - keyword: consultation
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: solution design
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: site assessment
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: site survey
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: civil works
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: regulatory approval
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: regulatory compliance
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: location sourcing
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: revenue sharing
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
+    - keyword: partnership
+      context: [charger, ev, charging, charge point, cpms, cpo, شحن, شاحن]
     # Moved from simple — too generic without EV context
     - keyword: battery charger
       context: [ev, electric vehicle, charging station, محطة شحن]
@@ -105,6 +145,20 @@ climatech:
       context: [شحن, شاحن, ev, charger]
     - keyword: تجهيز الموقع          # site preparation
       context: [شحن, شاحن, ev, charger]
+    - keyword: استشارات
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: تصميم الحلول
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: تقييم الموقع
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: مسح الموقع
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: أعمال مدنية
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: موافقات تنظيمية
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
+    - keyword: مشاركة الإيرادات
+      context: [شحن, شاحن, charger, ev, charging, cpms, cpo]
     # Moved from simple — SEC regulates all electrical work, not just EV
     - keyword: هيئة تنظيم الكهرباء   # SEC (electricity regulator)
       context: [شحن, شاحن, charger, ev, charging]
@@ -122,8 +176,16 @@ evs:
     - ev servicing
     - ev repair
     - ev diagnostics
+    - electric vehicle diagnostics
+    - electric vehicle repair
+    - electric vehicle service center
+    - ev workshop
+    - ev body shop
+    - ev aftersales
     - electric bus
     - electric truck
+    - electric bus maintenance
+    - electric truck maintenance
 
   simple_ar:
     # Specific — contain "كهربائية" (electric)
@@ -136,6 +198,39 @@ evs:
     - إصلاح المركبات الكهربائية     # EV repair
     - ورشة مركبات كهربائية         # EV workshop
     - قطع غيار المركبات الكهربائية  # EV spare parts
+    - مركز خدمة المركبات الكهربائية  # EV service center
+    - تشخيص المركبات الكهربائية     # EV diagnostics
+    - صيانة الحافلات الكهربائية     # electric bus maintenance
+    - صيانة الشاحنات الكهربائية     # electric truck maintenance
+
+  service_anchors_en:
+    - service
+    - maintenance
+    - repair
+    - diagnostics
+    - diagnostic
+    - battery
+    - module
+    - workshop
+    - aftersales
+    - body shop
+    - bodywork
+    - collision
+    - spare parts
+    - warranty
+
+  service_anchors_ar:
+    - خدمة
+    - صيانة
+    - إصلاح
+    - تشخيص
+    - بطارية
+    - وحدة
+    - ورشة
+    - هيكل
+    - دهان
+    - قطع غيار
+    - ضمان
 
   ev_anchors_en:
     - ev
@@ -227,6 +322,46 @@ evs:
       context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: preventive maintenance
       context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
+    - keyword: firmware
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: ota update
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: flashing
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: software diagnostics
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: module repair
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: battery module
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: high voltage battery
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: hv battery
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: bms
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: bms repair
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: motor repair
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: inverter repair
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: hv cable
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: connector inspection
+      context: [service, maintenance, repair, diagnostics, battery, module, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: infotainment
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: display unit
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: service package
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: warranty package
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: sim card configuration
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
+    - keyword: maps configuration
+      context: [service, maintenance, repair, diagnostics, workshop, aftersales, vehicle, fleet, ev]
 
   compound_ar:
     # Existing
@@ -249,3 +384,38 @@ evs:
       context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
     - keyword: هيكل ودهان             # body & paint
       context: [vehicle, vehicles, fleet, bus, buses, truck, trucks, مركبة, مركبات, سيارة, سيارات, أسطول, حافلة, حافلات, شاحنة, شاحنات]
+    - keyword: برمجة                  # firmware / coding
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: تحديث ota
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: تحديث برمجي
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: بطارية عالية الجهد
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: وحدة البطارية
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: نظام إدارة البطارية
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: إصلاح المحرك
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: إصلاح الانفرتر
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: كابل الجهد العالي
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: خدمة ما بعد البيع
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: ضمان ممتد
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+    - keyword: باقات صيانة
+      context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+
+sources:
+  tendersinfo_queries:
+    - ev charging station
+    - charge point operator
+    - charge point management system
+    - charging network
+    - electric vehicle maintenance
+    - electric bus maintenance
+    - electric truck maintenance
+    - ev battery diagnostics

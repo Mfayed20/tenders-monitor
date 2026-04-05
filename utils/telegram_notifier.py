@@ -14,6 +14,7 @@ If either env var is missing, notifications are silently skipped.
 
 import logging
 import os
+from html import escape as html_escape
 from typing import TYPE_CHECKING
 
 import httpx
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 _API_BASE = "https://api.telegram.org/bot{token}/sendMessage"
 _MAX_MESSAGE_LEN = 4096  # Telegram hard limit
+_MAX_DESCRIPTION_LEN = 180
 
 
 def _urgency_label(days_left: int | None) -> str:
@@ -37,18 +39,42 @@ def _urgency_label(days_left: int | None) -> str:
     return ""
 
 
+def _escape_telegram(text: str) -> str:
+    """Escape user-controlled text for Telegram HTML parse mode."""
+    return html_escape(text, quote=True)
+
+
+def _clip_text(text: str, limit: int = _MAX_DESCRIPTION_LEN) -> str:
+    """Trim long descriptions without cutting words mid-way."""
+    cleaned = " ".join(text.split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[:limit].rsplit(" ", 1)[0] + "..."
+
+
 def _format_tender(t: "TenderRow", index: int) -> str:
     urgency = _urgency_label(t.days_left)
     deadline = t.close_date if t.close_date else "Unknown"
     days = f" ({t.days_left}d left)" if t.days_left is not None else ""
+    safe_company = _escape_telegram(t.company_match)
+    safe_title = _escape_telegram(t.title)
+    safe_site = _escape_telegram(t.site)
+    safe_ref = _escape_telegram(t.ref_number)
+    safe_deadline = _escape_telegram(f"{deadline}{days}")
+    safe_link = html_escape(t.link, quote=True)
 
     lines = [
-        f"*{index}.{urgency} [{t.company_match}]*",
-        f"{t.title}",
-        f"Source: {t.site}  |  Ref: {t.ref_number}",
-        f"Deadline: {deadline}{days}",
-        f"[View tender]({t.link})",
+        f"<b>{index}.{_escape_telegram(urgency)} [{safe_company}]</b>",
+        safe_title,
+        f"Source: {safe_site} | Ref: {safe_ref}",
+        f"Deadline: {safe_deadline}",
     ]
+
+    if t.description:
+        lines.append(f"Scope: {_escape_telegram(_clip_text(t.description))}")
+    if t.link:
+        lines.append(f"<a href=\"{safe_link}\">View tender</a>")
+
     return "\n".join(lines)
 
 
@@ -63,17 +89,17 @@ def _build_messages(tenders: list["TenderRow"], date_str: str) -> list[str]:
     # Build full message as one block
     parts = []
     parts.append(
-        f"*KSA EV Tenders - {date_str}*\n"
+        f"<b>KSA EV Tenders - {_escape_telegram(date_str)}</b>\n"
         f"{len(tenders)} new match{'es' if len(tenders) != 1 else ''} found"
     )
 
     if climatech:
-        parts.append(f"\n*-- Climatech Charger ({len(climatech)}) --*")
+        parts.append(f"\n<b>Climatech Charger ({len(climatech)})</b>")
         for i, t in enumerate(climatech, 1):
             parts.append("\n" + _format_tender(t, i))
 
     if evs:
-        parts.append(f"\n*-- EVS ({len(evs)}) --*")
+        parts.append(f"\n<b>EVS ({len(evs)})</b>")
         for i, t in enumerate(evs, 1):
             parts.append("\n" + _format_tender(t, i))
 
@@ -126,7 +152,7 @@ async def send_telegram_alert(
     # Always send a status message, even when no matches found
     if not tenders:
         no_match_msg = (
-            f"*KSA EV Tenders - {date_str}*\n"
+            f"<b>KSA EV Tenders - {_escape_telegram(date_str)}</b>\n"
             f"Run complete. No new EV-related tenders found today."
         )
         async with httpx.AsyncClient(timeout=15) as client:
@@ -134,7 +160,7 @@ async def send_telegram_alert(
                 resp = await client.post(url, json={
                     "chat_id": cid,
                     "text": no_match_msg,
-                    "parse_mode": "Markdown",
+                    "parse_mode": "HTML",
                     "disable_web_page_preview": True,
                 })
                 resp.raise_for_status()
@@ -153,7 +179,7 @@ async def send_telegram_alert(
                 resp = await client.post(url, json={
                     "chat_id": cid,
                     "text": msg,
-                    "parse_mode": "Markdown",
+                    "parse_mode": "HTML",
                     "disable_web_page_preview": True,
                 })
                 resp.raise_for_status()
