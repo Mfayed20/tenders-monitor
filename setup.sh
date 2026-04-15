@@ -13,7 +13,7 @@ for cmd in python3 python; do
         version=$("$cmd" --version 2>&1 | grep -oP '\d+\.\d+')
         major=$(echo "$version" | cut -d. -f1)
         minor=$(echo "$version" | cut -d. -f2)
-        if [ "$major" -ge 3 ] && [ "$minor" -ge 10 ]; then
+        if [ "$major" -ge 3 ] && [ "$minor" -ge 13 ]; then
             PYTHON_CMD="$cmd"
             break
         fi
@@ -21,7 +21,7 @@ for cmd in python3 python; do
 done
 
 if [ -z "$PYTHON_CMD" ]; then
-    echo "ERROR: Python 3.10+ is required but not found."
+    echo "ERROR: Python 3.13+ is required but not found."
     exit 1
 fi
 
