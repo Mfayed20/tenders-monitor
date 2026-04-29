@@ -170,9 +170,33 @@ def test_execute_run_writes_summary_and_skips_telegram_when_disabled(monkeypatch
     daily_csvs = list(tmp_path.glob("tenders_*.csv"))
 
     assert sent_messages == []
-    assert summary["telegram"] == {"enabled": False, "sent": False}
+    assert summary["telegram"] == {"enabled": False, "configured": False, "sent": False}
     assert summary["totals"]["matched"] == 1
     assert summary_path.exists()
     assert json.loads(summary_path.read_text(encoding="utf-8"))["totals"]["matched"] == 1
     assert len(daily_csvs) == 1
     assert not (tmp_path / "all_tenders.csv").exists()
+
+
+def test_telegram_test_writes_summary(monkeypatch, tmp_path):
+    sent_messages = []
+
+    async def fake_send_test_message():
+        sent_messages.append("sent")
+        return True
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setattr(main, "send_telegram_test_message", fake_send_test_message)
+
+    settings = main.RuntimeSettings(output_dir=tmp_path, telegram_enabled=True)
+    summary = asyncio.run(main.execute_telegram_test(settings))
+
+    summary_path = tmp_path / "run_summary.json"
+    persisted = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert sent_messages == ["sent"]
+    assert summary["mode"] == "telegram_test"
+    assert summary["status"] == "ok"
+    assert summary["telegram"] == {"enabled": True, "configured": True, "sent": True}
+    assert persisted["mode"] == "telegram_test"

@@ -41,7 +41,11 @@ from scrapers.base import Tender
 from utils.keywords import match_tender
 from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ, has_date_text
 from utils.dedup import is_seen, mark_seen, purge_old, set_db_path
-from utils.telegram_notifier import send_telegram_alert
+from utils.telegram_notifier import (
+    send_telegram_alert,
+    send_telegram_test_message,
+    telegram_credentials_configured,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "output"
@@ -163,6 +167,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--close-window-days", type=int, help="Only include tenders closing within this many days")
     parser.add_argument("--dry-run", action="store_true", help="Run without Telegram sends or dedup writes")
     parser.add_argument("--no-telegram", action="store_true", help="Disable Telegram notifications for this run")
+    parser.add_argument("--telegram-test", action="store_true", help="Send a Telegram smoke-test message and exit")
     parser.add_argument(
         "--disable-scraper",
         action="append",
@@ -234,6 +239,8 @@ def settings_from_args(args: argparse.Namespace) -> RuntimeSettings:
     cli_disabled = _split_csv(args.disable_scraper)
     dry_run = args.dry_run or _parse_bool(os.getenv("TENDER_DRY_RUN"), False)
     telegram_enabled = _parse_bool(os.getenv("TENDER_TELEGRAM_ENABLED"), True)
+    if args.telegram_test:
+        telegram_enabled = True
     if args.no_telegram or dry_run:
         telegram_enabled = False
 
@@ -604,6 +611,7 @@ def build_run_summary(
         },
         "telegram": {
             "enabled": settings.telegram_enabled,
+            "configured": telegram_credentials_configured() if settings.telegram_enabled else False,
             "sent": telegram_sent,
         },
         "errors": scraper_errors,
@@ -720,6 +728,65 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
     return summary
 
 
+async def execute_telegram_test(settings: RuntimeSettings) -> dict[str, Any]:
+    global LOG_DIR
+
+    LOG_DIR = Path(settings.output_dir)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    date_str = datetime.now(KSA_TZ).strftime("%Y-%m-%d")
+    logger.info("=" * 60)
+    logger.info("KSA EV Tender Monitor — Telegram test started: %s", date_str)
+    logger.info("Settings: output_dir=%s telegram_enabled=%s", settings.output_dir, settings.telegram_enabled)
+    logger.info("=" * 60)
+
+    tg_ok = False
+    if settings.telegram_enabled:
+        tg_ok = await send_telegram_test_message()
+    else:
+        logger.warning("Telegram test requested but Telegram is disabled")
+
+    summary = {
+        "date": date_str,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "telegram_test",
+        "status": "ok" if tg_ok else "partial_failure",
+        "settings": {
+            "output_dir": str(settings.output_dir),
+            "seen_db_path": str(settings.seen_db_path),
+            "log_level": settings.log_level,
+            "telegram_enabled": settings.telegram_enabled,
+            "dry_run": settings.dry_run,
+        },
+        "totals": {
+            "raw": 0,
+            "matched": 0,
+            "rejected": 0,
+        },
+        "scrapers": [],
+        "filter_reject_counts": {},
+        "matched_counts": {},
+        "outputs": {
+            "log_file": str(Path(settings.output_dir) / "tender_monitor.log"),
+            "run_summary": str(Path(settings.output_dir) / "run_summary.json"),
+        },
+        "telegram": {
+            "enabled": settings.telegram_enabled,
+            "configured": telegram_credentials_configured() if settings.telegram_enabled else False,
+            "sent": tg_ok,
+        },
+        "errors": [] if tg_ok else ["Telegram test message was not sent"],
+    }
+    write_run_summary(summary, settings.output_dir)
+
+    if tg_ok:
+        logger.info("Telegram test completed successfully")
+    else:
+        logger.error("Telegram test failed")
+
+    return summary
+
+
 async def main(argv: list[str] | None = None) -> None:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -731,6 +798,12 @@ async def main(argv: list[str] | None = None) -> None:
 
     configure_logging(settings.output_dir, settings.log_level)
     set_db_path(settings.seen_db_path)
+
+    if args.telegram_test:
+        summary = await execute_telegram_test(settings)
+        if not summary["telegram"]["sent"]:
+            sys.exit(1)
+        return
 
     if args.purge:
         count = purge_old(days=90)
