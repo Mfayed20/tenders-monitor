@@ -10,11 +10,26 @@ Content-Type: application/x-www-form-urlencoded (NOT JSON)
 import logging
 
 import httpx
+from tenacity import (
+    AsyncRetrying,
+    before_sleep_log,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from scrapers.base import BaseScraper, Tender
 from utils.dates import parse_date
 
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable_http_error(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in {408, 429, 500, 502, 503, 504}
+    return False
 
 
 class TendersOnTimeScraper(BaseScraper):
@@ -24,6 +39,27 @@ class TendersOnTimeScraper(BaseScraper):
     NEEDS_BROWSER = False
 
     MAX_PAGES = 3  # 3 pages of results
+    RETRY_WAIT = wait_exponential(multiplier=2, min=2, max=10)
+
+    async def _fetch_page(self, client: httpx.AsyncClient, page_num: int) -> dict | list:
+        payload = f"regionkey=saudi-arabia-tenders&startpage={page_num}"
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=self.RETRY_WAIT,
+            retry=retry_if_exception(_is_retryable_http_error),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        ):
+            with attempt:
+                response = await client.post(
+                    self.API_URL,
+                    content=payload,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        return {}
 
     async def scrape(self, browser=None) -> list[Tender]:
         tenders = []
@@ -48,13 +84,7 @@ class TendersOnTimeScraper(BaseScraper):
                 self.logger.info("Fetching TendersOnTime page %d", page_num)
 
                 try:
-                    payload = f"regionkey=saudi-arabia-tenders&startpage={page_num}"
-                    response = await client.post(
-                        self.API_URL,
-                        content=payload,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
+                    data = await self._fetch_page(client, page_num)
                 except Exception as exc:
                     self.logger.exception(
                         "Failed to fetch TendersOnTime page %d", page_num
