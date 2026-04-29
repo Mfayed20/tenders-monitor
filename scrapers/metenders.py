@@ -56,8 +56,9 @@ class METendersScraper(BaseScraper):
 
                 try:
                     html = await self.fetch_with_retry(client, url)
-                except Exception:
+                except Exception as exc:
                     self.logger.exception("Failed to fetch METenders: %s", url)
+                    self.record_run_error(f"Failed to fetch METenders URL {url}", exc)
                     continue
 
                 page_tenders = self._parse_page(html)

@@ -70,8 +70,9 @@ class TendersInfoScraper(BaseScraper):
                     response = await client.post(url, data=payload)
                     response.raise_for_status()
                     return query, response.json()
-                except Exception:
+                except Exception as exc:
                     self.logger.exception("Failed to fetch TendersInfo for query: %s", query)
+                    self.record_run_error(f"Failed to fetch TendersInfo query '{query}'", exc)
                     return query, None
 
             results = await asyncio.gather(

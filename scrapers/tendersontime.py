@@ -55,10 +55,11 @@ class TendersOnTimeScraper(BaseScraper):
                     )
                     response.raise_for_status()
                     data = response.json()
-                except Exception:
+                except Exception as exc:
                     self.logger.exception(
                         "Failed to fetch TendersOnTime page %d", page_num
                     )
+                    self.record_run_error(f"Failed to fetch TendersOnTime page {page_num}", exc)
                     break
 
                 records = (

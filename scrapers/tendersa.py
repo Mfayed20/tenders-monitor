@@ -53,8 +53,9 @@ class TendersaScraper(BaseScraper):
             tenders = self._parse_page(html)
             self.logger.info("Found %d tenders on TenderSA", len(tenders))
 
-        except Exception:
+        except Exception as exc:
             self.logger.exception("Failed to scrape TenderSA")
+            self.record_run_error("Failed to scrape TenderSA", exc)
         finally:
             await context.close()
 

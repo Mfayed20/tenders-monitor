@@ -83,6 +83,7 @@ class ScraperRunStats:
     raw_count: int = 0
     elapsed_seconds: float = 0.0
     error: str = ""
+    fatal: bool = False
     disabled: bool = False
 
     @property
@@ -90,7 +91,7 @@ class ScraperRunStats:
         if self.disabled:
             return "disabled"
         if self.error:
-            return "failed"
+            return "failed" if self.fatal else "partial_failure"
         return "ok"
 
 
@@ -298,11 +299,17 @@ async def _run_single_scraper(scraper: Any, browser: Any = None) -> tuple[list[T
     started = time.perf_counter()
 
     try:
+        if hasattr(scraper, "reset_run_errors"):
+            scraper.reset_run_errors()
         tenders = await scraper.scrape(browser=browser)
         stats.raw_count = len(tenders)
+        run_errors = list(getattr(scraper, "run_errors", []))
+        if run_errors:
+            stats.error = " | ".join(run_errors)
         return tenders, stats
     except Exception as exc:
         stats.error = f"{type(exc).__name__}: {exc}"
+        stats.fatal = True
         logger.exception("Scraper %s failed", scraper.SITE_NAME)
         return [], stats
     finally:
@@ -548,6 +555,7 @@ def _build_scraper_summary(
             "rejected_count": sum(reject_counts.get(stats.site, Counter()).values()),
             "elapsed_seconds": stats.elapsed_seconds,
             "error": stats.error,
+            "fatal": stats.fatal,
         }
         for stats in sorted(scrape_stats, key=lambda item: item.site)
     ]

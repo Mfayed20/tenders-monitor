@@ -58,8 +58,9 @@ class KSAGateScraper(BaseScraper):
                         return []
                     response.raise_for_status()
                     return response.json()
-                except Exception:
+                except Exception as exc:
                     self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
+                    self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
                     return []
 
             import asyncio
