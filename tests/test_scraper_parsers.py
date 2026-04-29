@@ -123,6 +123,16 @@ def test_tendersontime_parser_extracts_record_fields():
     assert tender.link == "https://www.tendersontime.com/tender/ev-battery-diagnostics"
 
 
+def test_tendersontime_listing_parser_extracts_visible_rows():
+    tenders = TendersOnTimeScraper()._parse_listing_page(_read_text("tendersontime_listing.html"))
+
+    assert len(tenders) == 1
+    assert tenders[0].title == "EV Battery Diagnostics Services"
+    assert tenders[0].ref_number == "140369262"
+    assert tenders[0].close_date is not None
+    assert tenders[0].link == "https://www.tendersontime.com/tenders-details/ev-battery-diagnostics-85ddd6e/"
+
+
 def test_tendersontime_fetch_retries_transient_timeout():
     class FakeResponse:
         def raise_for_status(self):
