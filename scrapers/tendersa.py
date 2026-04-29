@@ -11,7 +11,6 @@ Tenders are in .details-wrapper containers with structured fields:
 - Ref ID: span[id*="lblTenderJoID"]
 """
 
-import asyncio
 import logging
 import re
 

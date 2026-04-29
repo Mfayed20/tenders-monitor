@@ -17,13 +17,17 @@ import argparse
 import asyncio
 import csv
 import html
+import json
 import logging
+import os
 import re
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -36,8 +40,13 @@ from scrapers.tendersontime import TendersOnTimeScraper
 from scrapers.base import Tender
 from utils.keywords import match_tender
 from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ, has_date_text
-from utils.dedup import is_seen, mark_seen, purge_old
+from utils.dedup import is_seen, mark_seen, purge_old, set_db_path
 from utils.telegram_notifier import send_telegram_alert
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "output"
+LOG_DIR = DEFAULT_OUTPUT_DIR
+
 
 @dataclass
 class TenderRow:
@@ -57,10 +66,64 @@ class TenderRow:
 class FilterDiagnostics:
     raw_total: int = 0
     matched_total: int = 0
+    matched_counts: Counter[str] = field(default_factory=Counter)
     reject_counts: dict[str, Counter[str]] = field(default_factory=dict)
 
     def record_reject(self, site: str, reason: str) -> None:
         self.reject_counts.setdefault(site, Counter())[reason] += 1
+
+    def record_match(self, site: str) -> None:
+        self.matched_counts[site] += 1
+
+
+@dataclass
+class ScraperRunStats:
+    site: str
+    needs_browser: bool
+    raw_count: int = 0
+    elapsed_seconds: float = 0.0
+    error: str = ""
+    disabled: bool = False
+
+    @property
+    def status(self) -> str:
+        if self.disabled:
+            return "disabled"
+        if self.error:
+            return "failed"
+        return "ok"
+
+
+@dataclass
+class RuntimeSettings:
+    output_dir: Path | str = DEFAULT_OUTPUT_DIR
+    seen_db_path: Path | str | None = None
+    log_level: str = "INFO"
+    run_window_hours: int = 168
+    close_window_days: int = 30
+    disabled_scrapers: set[str] = field(default_factory=set)
+    telegram_enabled: bool = True
+    dry_run: bool = False
+
+    def __post_init__(self) -> None:
+        self.output_dir = Path(self.output_dir).expanduser()
+        if self.seen_db_path is None:
+            self.seen_db_path = self.output_dir / "seen_tenders.db"
+        else:
+            self.seen_db_path = Path(self.seen_db_path).expanduser()
+        self.log_level = self.log_level.upper()
+
+    def validate(self, available_scrapers: set[str] | None = None) -> None:
+        if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise ValueError("log_level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL")
+        if self.run_window_hours <= 0:
+            raise ValueError("run_window_hours must be greater than 0")
+        if self.close_window_days <= 0:
+            raise ValueError("close_window_days must be greater than 0")
+        if available_scrapers is not None:
+            unknown = sorted(self.disabled_scrapers - available_scrapers)
+            if unknown:
+                raise ValueError(f"unknown disabled scraper(s): {', '.join(unknown)}")
 
 
 # ---------------------------------------------------------------------------
@@ -69,17 +132,6 @@ class FilterDiagnostics:
 
 load_dotenv()
 
-LOG_DIR = Path(__file__).resolve().parent / "output"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "tender_monitor.log", encoding="utf-8"),
-    ],
-)
 logger = logging.getLogger("main")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -100,21 +152,184 @@ SCRAPERS = [
 ]
 
 
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="KSA EV Tender Monitor")
+    parser.add_argument("--purge", action="store_true", help="Purge old dedup records and exit")
+    parser.add_argument("--output-dir", help="Directory for CSVs, logs, SQLite DB, and run summary")
+    parser.add_argument("--seen-db", help="Path to the SQLite dedup database")
+    parser.add_argument("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+    parser.add_argument("--run-window-hours", type=int, help="Only include tenders published within this many hours")
+    parser.add_argument("--close-window-days", type=int, help="Only include tenders closing within this many days")
+    parser.add_argument("--dry-run", action="store_true", help="Run without Telegram sends or dedup writes")
+    parser.add_argument("--no-telegram", action="store_true", help="Disable Telegram notifications for this run")
+    parser.add_argument(
+        "--disable-scraper",
+        action="append",
+        default=[],
+        help="Disable a scraper by site name; may be repeated or comma-separated",
+    )
+    return parser
+
+
+def _parse_bool(value: str | None, default: bool) -> bool:
+    if value is None or not value.strip():
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"invalid boolean value: {value}")
+
+
+def _parse_positive_int(name: str, value: int | str | None, default: int) -> int:
+    if value is None or value == "":
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+    return parsed
+
+
+def _split_csv(values: list[str] | str | None) -> list[str]:
+    if values is None:
+        return []
+    if isinstance(values, str):
+        values = [values]
+
+    out = []
+    for value in values:
+        out.extend(part.strip() for part in value.split(",") if part.strip())
+    return out
+
+
+def _normalize_scraper_name(name: str) -> str:
+    return re.sub(r"[\s_-]+", "", name.casefold())
+
+
+def resolve_scraper_names(names: list[str]) -> set[str]:
+    available = {_normalize_scraper_name(scraper.SITE_NAME): scraper.SITE_NAME for scraper in SCRAPERS}
+    resolved = set()
+    unknown = []
+
+    for name in names:
+        normalized = _normalize_scraper_name(name)
+        if normalized in available:
+            resolved.add(available[normalized])
+        else:
+            unknown.append(name)
+
+    if unknown:
+        raise ValueError(f"unknown disabled scraper(s): {', '.join(sorted(unknown))}")
+    return resolved
+
+
+def settings_from_args(args: argparse.Namespace) -> RuntimeSettings:
+    env_disabled = _split_csv(os.getenv("TENDER_DISABLED_SCRAPERS"))
+    cli_disabled = _split_csv(args.disable_scraper)
+    dry_run = args.dry_run or _parse_bool(os.getenv("TENDER_DRY_RUN"), False)
+    telegram_enabled = _parse_bool(os.getenv("TENDER_TELEGRAM_ENABLED"), True)
+    if args.no_telegram or dry_run:
+        telegram_enabled = False
+
+    output_dir = args.output_dir or os.getenv("TENDER_OUTPUT_DIR") or DEFAULT_OUTPUT_DIR
+    seen_db = args.seen_db or os.getenv("TENDER_SEEN_DB_PATH")
+    settings = RuntimeSettings(
+        output_dir=output_dir,
+        seen_db_path=seen_db,
+        log_level=args.log_level or os.getenv("TENDER_LOG_LEVEL", "INFO"),
+        run_window_hours=_parse_positive_int(
+            "run_window_hours",
+            args.run_window_hours if args.run_window_hours is not None else os.getenv("TENDER_RUN_WINDOW_HOURS"),
+            168,
+        ),
+        close_window_days=_parse_positive_int(
+            "close_window_days",
+            args.close_window_days if args.close_window_days is not None else os.getenv("TENDER_CLOSE_WINDOW_DAYS"),
+            30,
+        ),
+        disabled_scrapers=resolve_scraper_names(env_disabled + cli_disabled),
+        telegram_enabled=telegram_enabled,
+        dry_run=dry_run,
+    )
+    settings.validate({scraper.SITE_NAME for scraper in SCRAPERS})
+    return settings
+
+
+def configure_logging(output_dir: Path | str, log_level: str = "INFO") -> None:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        if getattr(handler, "_tender_monitor_handler", False):
+            root_logger.removeHandler(handler)
+            handler.close()
+
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    stream_handler = logging.StreamHandler(sys.stdout)
+    file_handler = logging.FileHandler(output_path / "tender_monitor.log", encoding="utf-8")
+
+    for handler in (stream_handler, file_handler):
+        handler.setFormatter(formatter)
+        handler._tender_monitor_handler = True
+        root_logger.addHandler(handler)
+
+    root_logger.setLevel(getattr(logging, log_level.upper()))
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+def enabled_scrapers(settings: RuntimeSettings) -> list[Any]:
+    return [scraper for scraper in SCRAPERS if scraper.SITE_NAME not in settings.disabled_scrapers]
+
+
 # ---------------------------------------------------------------------------
 # Core pipeline
 # ---------------------------------------------------------------------------
 
-async def run_scrapers() -> list[Tender]:
-    """Run all scrapers, using a shared Playwright browser for JS-heavy sites."""
-    all_tenders: list[Tender] = []
-    browser = None
-
-    # Check if any scraper needs a browser
-    needs_browser = any(s.NEEDS_BROWSER for s in SCRAPERS)
+async def _run_single_scraper(scraper: Any, browser: Any = None) -> tuple[list[Tender], ScraperRunStats]:
+    """Run one scraper and return both tenders and operational stats."""
+    stats = ScraperRunStats(site=scraper.SITE_NAME, needs_browser=scraper.NEEDS_BROWSER)
+    started = time.perf_counter()
 
     try:
-        if needs_browser:
+        tenders = await scraper.scrape(browser=browser)
+        stats.raw_count = len(tenders)
+        return tenders, stats
+    except Exception as exc:
+        stats.error = f"{type(exc).__name__}: {exc}"
+        logger.exception("Scraper %s failed", scraper.SITE_NAME)
+        return [], stats
+    finally:
+        stats.elapsed_seconds = round(time.perf_counter() - started, 3)
+
+
+async def run_scrapers(scrapers: list[Any] | None = None) -> tuple[list[Tender], list[ScraperRunStats]]:
+    """Run all enabled scrapers, using a shared Playwright browser for JS-heavy sites."""
+    scrapers = scrapers if scrapers is not None else SCRAPERS
+    all_tenders: list[Tender] = []
+    stats: list[ScraperRunStats] = []
+    browser = None
+    pw = None
+
+    http_scrapers = [s for s in scrapers if not s.NEEDS_BROWSER]
+    browser_scrapers = [s for s in scrapers if s.NEEDS_BROWSER]
+
+    if http_scrapers:
+        results = await asyncio.gather(*[_run_single_scraper(scraper) for scraper in http_scrapers])
+        for tenders, scraper_stats in results:
+            all_tenders.extend(tenders)
+            stats.append(scraper_stats)
+
+    if browser_scrapers:
+        try:
             from playwright.async_api import async_playwright
+
             pw = await async_playwright().start()
             browser = await pw.chromium.launch(
                 headless=True,
@@ -126,38 +341,31 @@ async def run_scrapers() -> list[Tender]:
             )
             logger.info("Playwright browser launched")
 
-        # Run httpx-based scrapers concurrently
-        http_scrapers = [s for s in SCRAPERS if not s.NEEDS_BROWSER]
-        http_tasks = [s.scrape() for s in http_scrapers]
-
-        if http_tasks:
-            results = await asyncio.gather(*http_tasks, return_exceptions=True)
-            for scraper, result in zip(http_scrapers, results):
-                if isinstance(result, Exception):
-                    logger.error(
-                        "Scraper %s failed: %s", scraper.SITE_NAME, result
+            results = await asyncio.gather(
+                *[_run_single_scraper(scraper, browser=browser) for scraper in browser_scrapers]
+            )
+            for tenders, scraper_stats in results:
+                all_tenders.extend(tenders)
+                stats.append(scraper_stats)
+        except Exception as exc:
+            logger.exception("Playwright setup failed; browser-based scrapers skipped")
+            for scraper in browser_scrapers:
+                stats.append(
+                    ScraperRunStats(
+                        site=scraper.SITE_NAME,
+                        needs_browser=True,
+                        error=f"Playwright setup failed: {type(exc).__name__}: {exc}",
                     )
-                else:
-                    all_tenders.extend(result)
+                )
+        finally:
+            if browser:
+                await browser.close()
+            if pw:
+                await pw.stop()
+            if browser or pw:
+                logger.info("Playwright browser closed")
 
-        # Run browser-based scrapers concurrently (separate contexts)
-        browser_scrapers = [s for s in SCRAPERS if s.NEEDS_BROWSER]
-        if browser_scrapers:
-            browser_tasks = [s.scrape(browser=browser) for s in browser_scrapers]
-            browser_results = await asyncio.gather(*browser_tasks, return_exceptions=True)
-            for scraper, result in zip(browser_scrapers, browser_results):
-                if isinstance(result, Exception):
-                    logger.error("Scraper %s failed: %s", scraper.SITE_NAME, result)
-                else:
-                    all_tenders.extend(result)
-
-    finally:
-        if browser:
-            await browser.close()
-            await pw.stop()
-            logger.info("Playwright browser closed")
-
-    return all_tenders
+    return all_tenders, stats
 
 
 def _clean_title(raw: str, max_len: int = 120) -> str:
@@ -190,7 +398,12 @@ def _log_filter_diagnostics(diagnostics: FilterDiagnostics) -> None:
             logger.info("Reject summary [%s]: %s", site, summary)
 
 
-def filter_tenders(tenders: list[Tender]) -> tuple[list[TenderRow], FilterDiagnostics]:
+def filter_tenders(
+    tenders: list[Tender],
+    run_window_hours: int = 168,
+    close_window_days: int = 30,
+    dry_run: bool = False,
+) -> tuple[list[TenderRow], FilterDiagnostics]:
     """
     Filter tenders by:
     1. EV keyword match (English + Arabic)
@@ -221,13 +434,13 @@ def filter_tenders(tenders: list[Tender]) -> tuple[list[TenderRow], FilterDiagno
         if t.publish_date and t.publish_date > now:
             diagnostics.record_reject(t.site, "future_publish_date")
             continue
-        if not is_new_tender(t.publish_date, hours=168):  # 7 days
+        if not is_new_tender(t.publish_date, hours=run_window_hours):
             diagnostics.record_reject(t.site, "publish_window")
             continue
         if t.close_date and t.close_date < now:
             diagnostics.record_reject(t.site, "already_closed")
             continue
-        if not is_closing_soon(t.close_date):
+        if not is_closing_soon(t.close_date, days=close_window_days):
             diagnostics.record_reject(t.site, "close_window")
             continue
 
@@ -238,7 +451,8 @@ def filter_tenders(tenders: list[Tender]) -> tuple[list[TenderRow], FilterDiagno
             continue
 
         # Mark as seen
-        mark_seen(t.site, t.title, t.ref_number)
+        if not dry_run:
+            mark_seen(t.site, t.title, t.ref_number)
 
         # Calculate days until closing
         days_left = None
@@ -258,14 +472,22 @@ def filter_tenders(tenders: list[Tender]) -> tuple[list[TenderRow], FilterDiagno
             matched_keywords=", ".join(result.matched_keywords[:5]),
             description=t.description[:200] if t.description else "",
         ))
+        diagnostics.record_match(t.site)
 
     diagnostics.matched_total = len(matched)
     return matched, diagnostics
 
 
-def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
+def write_csv(
+    tenders: list[TenderRow],
+    date_str: str,
+    output_dir: Path | str | None = None,
+    append_master: bool = True,
+) -> Path:
     """Write a daily snapshot CSV and append non-empty runs to the master CSV."""
-    csv_path = LOG_DIR / f"tenders_{date_str}.csv"
+    out_dir = Path(output_dir) if output_dir is not None else LOG_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / f"tenders_{date_str}.csv"
 
     def _to_row(t):
         return [
@@ -286,8 +508,12 @@ def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
         logger.info("Daily CSV snapshot written: %s (0 rows)", csv_path.name)
         return csv_path
 
+    if not append_master:
+        logger.info("Daily CSV snapshot written: %s (%d rows); master append skipped", csv_path.name, len(tenders))
+        return csv_path
+
     # 2. Master CSV (cumulative — all matches ever found)
-    master_path = LOG_DIR / "all_tenders.csv"
+    master_path = out_dir / "all_tenders.csv"
     write_master_header = not master_path.exists()
     with open(master_path, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
@@ -300,54 +526,210 @@ def write_csv(tenders: list[TenderRow], date_str: str) -> Path:
     return csv_path
 
 
+def _counter_map_to_dict(counters: dict[str, Counter[str]]) -> dict[str, dict[str, int]]:
+    return {site: dict(counter) for site, counter in sorted(counters.items())}
+
+
+def _build_scraper_summary(
+    scrape_stats: list[ScraperRunStats],
+    diagnostics: FilterDiagnostics,
+) -> list[dict[str, Any]]:
+    reject_counts = diagnostics.reject_counts
+    matched_counts = diagnostics.matched_counts
+
+    return [
+        {
+            "site": stats.site,
+            "status": stats.status,
+            "needs_browser": stats.needs_browser,
+            "disabled": stats.disabled,
+            "raw_count": stats.raw_count,
+            "matched_count": matched_counts.get(stats.site, 0),
+            "rejected_count": sum(reject_counts.get(stats.site, Counter()).values()),
+            "elapsed_seconds": stats.elapsed_seconds,
+            "error": stats.error,
+        }
+        for stats in sorted(scrape_stats, key=lambda item: item.site)
+    ]
+
+
+def build_run_summary(
+    *,
+    date_str: str,
+    settings: RuntimeSettings,
+    scrape_stats: list[ScraperRunStats],
+    diagnostics: FilterDiagnostics,
+    csv_path: Path,
+    telegram_sent: bool,
+) -> dict[str, Any]:
+    rejected_total = sum(sum(counter.values()) for counter in diagnostics.reject_counts.values())
+    scraper_errors = [stats.error for stats in scrape_stats if stats.error]
+
+    return {
+        "date": date_str,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "partial_failure" if scraper_errors else "ok",
+        "settings": {
+            "output_dir": str(settings.output_dir),
+            "seen_db_path": str(settings.seen_db_path),
+            "log_level": settings.log_level,
+            "run_window_hours": settings.run_window_hours,
+            "close_window_days": settings.close_window_days,
+            "disabled_scrapers": sorted(settings.disabled_scrapers),
+            "telegram_enabled": settings.telegram_enabled,
+            "dry_run": settings.dry_run,
+        },
+        "totals": {
+            "raw": diagnostics.raw_total,
+            "matched": diagnostics.matched_total,
+            "rejected": rejected_total,
+        },
+        "scrapers": _build_scraper_summary(scrape_stats, diagnostics),
+        "filter_reject_counts": _counter_map_to_dict(diagnostics.reject_counts),
+        "matched_counts": dict(sorted(diagnostics.matched_counts.items())),
+        "outputs": {
+            "daily_csv": str(csv_path),
+            "master_csv": str(Path(settings.output_dir) / "all_tenders.csv"),
+            "log_file": str(Path(settings.output_dir) / "tender_monitor.log"),
+            "seen_db": str(settings.seen_db_path),
+            "run_summary": str(Path(settings.output_dir) / "run_summary.json"),
+        },
+        "telegram": {
+            "enabled": settings.telegram_enabled,
+            "sent": telegram_sent,
+        },
+        "errors": scraper_errors,
+    }
+
+
+def write_run_summary(summary: dict[str, Any], output_dir: Path | str | None = None) -> Path:
+    out_dir = Path(output_dir) if output_dir is not None else LOG_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = out_dir / "run_summary.json"
+    with open(summary_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    logger.info("Run summary written: %s", summary_path.name)
+    return summary_path
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-async def main():
-    parser = argparse.ArgumentParser(description="KSA EV Tender Monitor")
-    parser.add_argument("--purge", action="store_true", help="Purge old dedup records and exit")
-    args = parser.parse_args()
+async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
+    global LOG_DIR
 
-    if args.purge:
-        count = purge_old(days=90)
-        logger.info("Purged %d old dedup records", count)
-        return
+    LOG_DIR = Path(settings.output_dir)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    set_db_path(settings.seen_db_path)
+
+    selected_scrapers = enabled_scrapers(settings)
+    disabled_stats = [
+        ScraperRunStats(
+            site=scraper.SITE_NAME,
+            needs_browser=scraper.NEEDS_BROWSER,
+            disabled=True,
+        )
+        for scraper in SCRAPERS
+        if scraper.SITE_NAME in settings.disabled_scrapers
+    ]
 
     date_str = datetime.now(KSA_TZ).strftime("%Y-%m-%d")
     logger.info("=" * 60)
     logger.info("KSA EV Tender Monitor — Run started: %s", date_str)
+    logger.info(
+        "Settings: output_dir=%s seen_db=%s run_window_hours=%d close_window_days=%d "
+        "telegram_enabled=%s dry_run=%s disabled_scrapers=%s",
+        settings.output_dir,
+        settings.seen_db_path,
+        settings.run_window_hours,
+        settings.close_window_days,
+        settings.telegram_enabled,
+        settings.dry_run,
+        ", ".join(sorted(settings.disabled_scrapers)) or "none",
+    )
     logger.info("=" * 60)
 
     # Step 1: Scrape all sites
-    logger.info("Step 1: Scraping %d sites...", len(SCRAPERS))
-    all_tenders = await run_scrapers()
+    logger.info("Step 1: Scraping %d enabled sites...", len(selected_scrapers))
+    all_tenders, scrape_stats = await run_scrapers(selected_scrapers)
+    scrape_stats.extend(disabled_stats)
     logger.info("Total raw tenders scraped: %d", len(all_tenders))
 
     if not all_tenders:
         logger.warning("No tenders scraped from any site — check scrapers")
-        return
 
     # Step 2: Filter by keywords, dates, dedup
     logger.info("Step 2: Filtering tenders...")
-    matched, diagnostics = filter_tenders(all_tenders)
+    matched, diagnostics = filter_tenders(
+        all_tenders,
+        run_window_hours=settings.run_window_hours,
+        close_window_days=settings.close_window_days,
+        dry_run=settings.dry_run,
+    )
     logger.info("Matched tenders after filtering: %d", len(matched))
     _log_filter_diagnostics(diagnostics)
 
     # Step 3: Write CSV (always, even if empty — for audit trail)
-    csv_path = write_csv(matched, date_str)
+    csv_path = write_csv(
+        matched,
+        date_str,
+        output_dir=settings.output_dir,
+        append_master=not settings.dry_run,
+    )
 
     # Step 4: Send Telegram alert (always — matches or no matches)
-    tg_ok = await send_telegram_alert(matched, date_str)
-    if tg_ok:
-        logger.info("Telegram alert sent successfully")
+    tg_ok = False
+    if settings.telegram_enabled:
+        tg_ok = await send_telegram_alert(matched, date_str)
+        if tg_ok:
+            logger.info("Telegram alert sent successfully")
+        else:
+            logger.debug("Telegram alert skipped or failed (check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)")
     else:
-        logger.debug("Telegram alert skipped or failed (check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)")
+        logger.info("Telegram alert disabled")
+
+    summary = build_run_summary(
+        date_str=date_str,
+        settings=settings,
+        scrape_stats=scrape_stats,
+        diagnostics=diagnostics,
+        csv_path=csv_path,
+        telegram_sent=tg_ok,
+    )
+    summary_path = write_run_summary(summary, settings.output_dir)
 
     # Summary
     logger.info("=" * 60)
-    logger.info("Run complete. CSV: %s | Matches: %d", csv_path.name, len(matched))
+    logger.info(
+        "Run complete. CSV: %s | Summary: %s | Matches: %d",
+        csv_path.name,
+        summary_path.name,
+        len(matched),
+    )
     logger.info("=" * 60)
+    return summary
+
+
+async def main(argv: list[str] | None = None) -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        settings = settings_from_args(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    configure_logging(settings.output_dir, settings.log_level)
+    set_db_path(settings.seen_db_path)
+
+    if args.purge:
+        count = purge_old(days=90)
+        logger.info("Purged %d old dedup records from %s", count, settings.seen_db_path)
+        return
+
+    await execute_run(settings)
 
 
 if __name__ == "__main__":
