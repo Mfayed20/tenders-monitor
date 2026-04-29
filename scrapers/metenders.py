@@ -16,7 +16,6 @@ Tenders are in <tbody> blocks with:
 import logging
 import re
 
-import httpx
 from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Tender
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 class METendersScraper(BaseScraper):
     SITE_NAME = "METenders"
     BASE_URL = "https://metenders.com"
-    NEEDS_BROWSER = False
+    NEEDS_BROWSER = True
 
     # Pages with actual tender listings
     SCRAPE_URLS = [
@@ -36,26 +35,29 @@ class METendersScraper(BaseScraper):
     ]
 
     async def scrape(self, browser=None) -> list[Tender]:
+        if browser is None:
+            self.logger.error("METenders requires a Playwright browser instance")
+            return []
+
         tenders = []
         seen_refs = set()
+        context = await browser.new_context(
+            locale="en-US",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+        )
+        page = await context.new_page()
 
-        async with httpx.AsyncClient(
-            timeout=30,
-            follow_redirects=True,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept-Language": "en-US,en;q=0.9",
-            },
-        ) as client:
+        try:
             for url in self.SCRAPE_URLS:
                 self.logger.info("Fetching METenders: %s", url)
 
                 try:
-                    html = await self.fetch_with_retry(client, url)
+                    html = await self._load_listing_page(page, url)
                 except Exception as exc:
                     self.logger.exception("Failed to fetch METenders: %s", url)
                     self.record_run_error(f"Failed to fetch METenders URL {url}", exc)
@@ -73,9 +75,21 @@ class METendersScraper(BaseScraper):
                     "Found %d tenders on %s",
                     len(page_tenders), url.split("/")[-1],
                 )
+        finally:
+            await context.close()
 
         self.logger.info("METenders total: %d tenders scraped", len(tenders))
         return tenders
+
+    async def _load_listing_page(self, page, url: str) -> str:
+        """Load a METenders listing page through a browser to avoid direct HTTP blocking."""
+        await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        try:
+            await page.wait_for_selector('a[href*="RequestInfo.asp"]', state="attached", timeout=12000)
+        except Exception as exc:
+            self.logger.warning("METenders tender links were not attached within timeout: %s", exc)
+        await page.wait_for_timeout(1000)
+        return await page.content()
 
     def _parse_page(self, html: str) -> list[Tender]:
         """Parse tenders from METenders HTML using tbody blocks."""
