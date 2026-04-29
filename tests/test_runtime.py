@@ -2,7 +2,7 @@ import asyncio
 import json
 
 import main
-from scrapers.base import Tender
+from scrapers.base import BaseScraper, Tender
 from utils.dedup import get_db_path, is_seen, mark_seen, set_db_path
 
 
@@ -96,6 +96,51 @@ def test_run_scrapers_records_partial_failures():
     assert len(tenders) == 1
     assert {item.site: item.status for item in stats} == {"Good": "ok", "Bad": "failed"}
     assert "RuntimeError: boom" in next(item.error for item in stats if item.site == "Bad")
+
+
+def test_run_scrapers_records_handled_scraper_errors_as_partial_failure():
+    class HandledErrorScraper(BaseScraper):
+        SITE_NAME = "Handled"
+
+        async def scrape(self, browser=None):
+            try:
+                raise TimeoutError("site timed out")
+            except TimeoutError as exc:
+                self.record_run_error("Failed to fetch handled source", exc)
+            return []
+
+    tenders, stats = asyncio.run(main.run_scrapers([HandledErrorScraper()]))
+
+    assert tenders == []
+    assert len(stats) == 1
+    assert stats[0].status == "partial_failure"
+    assert stats[0].fatal is False
+    assert "Failed to fetch handled source: TimeoutError: site timed out" == stats[0].error
+
+
+def test_run_summary_marks_handled_scraper_errors_as_partial_failure(tmp_path):
+    diagnostics = main.FilterDiagnostics(raw_total=0)
+    stats = [
+        main.ScraperRunStats(
+            site="Handled",
+            needs_browser=False,
+            error="Failed to fetch handled source: TimeoutError: site timed out",
+        )
+    ]
+    settings = main.RuntimeSettings(output_dir=tmp_path, telegram_enabled=False)
+
+    summary = main.build_run_summary(
+        date_str="2026-04-29",
+        settings=settings,
+        scrape_stats=stats,
+        diagnostics=diagnostics,
+        csv_path=tmp_path / "tenders_2026-04-29.csv",
+        telegram_sent=False,
+    )
+
+    assert summary["status"] == "partial_failure"
+    assert summary["scrapers"][0]["status"] == "partial_failure"
+    assert summary["scrapers"][0]["fatal"] is False
 
 
 def test_execute_run_writes_summary_and_skips_telegram_when_disabled(monkeypatch, tmp_path):

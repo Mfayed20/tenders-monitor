@@ -43,6 +43,19 @@ class BaseScraper(ABC):
 
     def __init__(self):
         self.logger = logging.getLogger(f"scraper.{self.SITE_NAME}")
+        self.run_errors: list[str] = []
+
+    def reset_run_errors(self) -> None:
+        """Clear errors recorded during a previous scrape attempt."""
+        self.run_errors = []
+
+    def record_run_error(self, message: str, exc: Exception | None = None) -> None:
+        """Record a handled scrape error so the run summary can report it."""
+        if exc is None:
+            self.run_errors.append(message)
+            return
+
+        self.run_errors.append(f"{message}: {type(exc).__name__}: {exc}")
 
     @abstractmethod
     async def scrape(self, browser=None) -> list[Tender]:

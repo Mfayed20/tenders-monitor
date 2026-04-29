@@ -52,8 +52,9 @@ class EtimadScraper(BaseScraper):
                     await page.goto(url, wait_until="networkidle", timeout=60000)
                     await page.wait_for_timeout(3000)
                     html = await page.content()
-                except Exception:
+                except Exception as exc:
                     self.logger.exception("Failed to load Etimad page %d", page_num)
+                    self.record_run_error(f"Failed to load Etimad page {page_num}", exc)
                     break
 
                 page_tenders = self._parse_page(html)
