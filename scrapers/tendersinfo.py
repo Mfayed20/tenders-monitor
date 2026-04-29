@@ -3,7 +3,7 @@ Scraper for tendersinfo.com — international tender aggregator.
 URL: https://www.tendersinfo.com/global-saudi-arabia-tenders.php
 
 Uses the DataTables AJAX API directly instead of scraping rendered HTML.
-Endpoint: POST /esearch/results_test/{search_text}/{type}
+Endpoint: POST /esearch/tender_sector_test
 Returns JSON with tender data.
 """
 
@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Tender
 from utils.dates import parse_date
-from utils.keywords import TENDERSINFO_QUERIES
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +21,14 @@ logger = logging.getLogger(__name__)
 class TendersInfoScraper(BaseScraper):
     SITE_NAME = "TendersInfo"
     BASE_URL = "https://www.tendersinfo.com"
-    API_URL = "https://www.tendersinfo.com/esearch/results_test"
+    API_URL = "https://www.tendersinfo.com/esearch/tender_sector_test"
     NEEDS_BROWSER = False
 
-    # Search terms — the /location endpoint already filters to Saudi Arabia
-    SEARCH_QUERIES = TENDERSINFO_QUERIES
+    # Hidden field value from https://www.tendersinfo.com/global-saudi-arabia-tenders.php
+    SAUDI_COUNTRY_ID = "0300682"
+    NOTICE_TYPE = "1, 3, 8"
     PAGE_SIZE = 50
+    MAX_PAGES = 3
 
     async def scrape(self, browser=None) -> list[Tender]:
         tenders = []
@@ -48,45 +49,32 @@ class TendersInfoScraper(BaseScraper):
                 "Origin": "https://www.tendersinfo.com",
             },
         ) as client:
-            # Fetch all queries concurrently
             import asyncio
 
-            async def _fetch_query(query):
-                encoded = query.replace(" ", "%20")
-                url = f"{self.API_URL}/{encoded}/location"
-                self.logger.info("Fetching TendersInfo API: %s", query)
+            async def _fetch_page(page_num: int):
+                start = (page_num - 1) * self.PAGE_SIZE
+                self.logger.info("Fetching TendersInfo Saudi page %d", page_num)
                 try:
-                    payload = {
-                        "draw": "1",
-                        "start": "0",
-                        "length": str(self.PAGE_SIZE),
-                        "columns[0][data]": "site_tender_id",
-                        "columns[1][data]": "region_name",
-                        "columns[2][data]": "tender_sector",
-                        "columns[3][data]": "short_desc",
-                        "columns[4][data]": "date_c",
-                        "columns[5][data]": "doc_last",
-                    }
-                    response = await client.post(url, data=payload)
+                    response = await client.post(self.API_URL, data=self._build_payload(page_num, start))
                     response.raise_for_status()
-                    return query, response.json()
+                    return page_num, response.json()
                 except Exception as exc:
-                    self.logger.exception("Failed to fetch TendersInfo for query: %s", query)
-                    self.record_run_error(f"Failed to fetch TendersInfo query '{query}'", exc)
-                    return query, None
+                    self.logger.exception("Failed to fetch TendersInfo Saudi page %d", page_num)
+                    self.record_run_error(f"Failed to fetch TendersInfo Saudi page {page_num}", exc)
+                    return page_num, None
 
             results = await asyncio.gather(
-                *[_fetch_query(q) for q in self.SEARCH_QUERIES]
+                *[_fetch_page(page_num) for page_num in range(1, self.MAX_PAGES + 1)]
             )
 
-            for query, data in results:
+            for page_num, data in results:
                 if data is None:
                     continue
 
                 records = data.get("data", [])
                 self.logger.info(
-                    "TendersInfo query '%s': %d records (total: %s)",
-                    query, len(records), data.get("recordsTotal", "?"),
+                    "TendersInfo Saudi page %d: %d records (total: %s)",
+                    page_num, len(records), data.get("recordsTotal", "?"),
                 )
 
                 for record in records:
@@ -107,6 +95,26 @@ class TendersInfoScraper(BaseScraper):
         self.logger.info("TendersInfo total: %d tenders scraped", len(tenders))
         return tenders
 
+    def _build_payload(self, draw: int, start: int) -> dict[str, str]:
+        """Build the DataTables payload used by the Saudi Arabia listing page."""
+        return {
+            "draw": str(draw),
+            "start": str(start),
+            "length": str(self.PAGE_SIZE),
+            "columns[0][data]": "site_tender_id",
+            "columns[1][data]": "region_name",
+            "columns[2][data]": "date_c",
+            "columns[3][data]": "short_desc",
+            "columns[4][data]": "doc_last",
+            "sectortxt": "",
+            "countrytxt": self.SAUDI_COUNTRY_ID,
+            "region_txt": "",
+            "country_code": "",
+            "cpvtxt": "",
+            "notice_type": self.NOTICE_TYPE,
+            "authoritytxt": "",
+        }
+
     def _parse_record(self, record: dict) -> Tender | None:
         """Parse a tender from the DataTables API JSON record."""
         # Fields may contain HTML — strip tags
@@ -124,8 +132,9 @@ class TendersInfoScraper(BaseScraper):
             url = f"{self.BASE_URL}/{url.lstrip('/')}"
 
         description_parts = [
-            self._strip_html(record.get("tender_sector", "")),
+            self._strip_html(record.get("sector_name", "") or record.get("tender_sector", "")),
             self._strip_html(record.get("region_name", "")),
+            self._strip_html(record.get("organisation_h", "")),
         ]
         description = " | ".join(part for part in description_parts if part)
 

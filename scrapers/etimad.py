@@ -49,13 +49,14 @@ class EtimadScraper(BaseScraper):
                 self.logger.info("Fetching Etimad page %d: %s", page_num, url)
 
                 try:
-                    await page.goto(url, wait_until="networkidle", timeout=60000)
-                    await page.wait_for_timeout(3000)
-                    html = await page.content()
+                    html = await self._load_listing_page(page, url)
                 except Exception as exc:
-                    self.logger.exception("Failed to load Etimad page %d", page_num)
-                    self.record_run_error(f"Failed to load Etimad page {page_num}", exc)
-                    break
+                    html = await page.content()
+                    if "DetailsForVisitor" not in html:
+                        self.logger.exception("Failed to load Etimad page %d", page_num)
+                        self.record_run_error(f"Failed to load Etimad page {page_num}", exc)
+                        break
+                    self.logger.warning("Etimad page %d load raised %s, but detail links were available", page_num, exc)
 
                 page_tenders = self._parse_page(html)
                 if not page_tenders:
@@ -70,6 +71,23 @@ class EtimadScraper(BaseScraper):
 
         self.logger.info("Etimad total: %d tenders scraped", len(tenders))
         return tenders
+
+    async def _load_listing_page(self, page, url: str) -> str:
+        """Load a listing page without requiring every long-polling resource to go idle."""
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+        try:
+            await page.wait_for_selector('a[href*="DetailsForVisitor"]', state="attached", timeout=15000)
+        except Exception as exc:
+            self.logger.warning("Etimad detail links were not attached within timeout: %s", exc)
+
+        try:
+            await page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            self.logger.debug("Etimad network did not go idle; continuing with current DOM")
+
+        await page.wait_for_timeout(1000)
+        return await page.content()
 
     def _parse_page(self, html: str) -> list[Tender]:
         """Parse tenders from Etimad HTML."""

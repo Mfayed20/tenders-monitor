@@ -79,7 +79,9 @@ class TendersaScraper(BaseScraper):
         # Title and link
         title_el = wrapper.select_one(
             ".FirstRowTndrNam h4 a[href*='TenderDetails'], "
-            ".FirstRowTndrNam a[href*='TenderDetails']"
+            ".FirstRowTndrNam a[href*='TenderDetails'], "
+            "h4 a[href*='TenderDetails'], "
+            "a[href*='TenderDetails']"
         )
         if not title_el:
             return None
@@ -89,33 +91,44 @@ class TendersaScraper(BaseScraper):
             return None
 
         href = title_el.get("href", "")
-        link = f"{self.BASE_URL}/{href}" if href and not href.startswith("http") else href
+        link = self._full_url(href)
+        wrapper_text = re.sub(r"\s+", " ", wrapper.get_text(" ", strip=True))
 
-        # Publish date — inside .take-off div
+        # Publish date
         publish_date = None
         publish_date_raw = ""
         takeoff = wrapper.select_one(".take-off")
         if takeoff:
             text = takeoff.get_text()
-            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
+            date_match = self._find_date(text)
             if date_match:
-                publish_date_raw = date_match.group(1)
+                publish_date_raw = date_match
                 publish_date = parse_date(publish_date_raw)
+        if not publish_date_raw:
+            publish_date_raw = self._find_labeled_date(wrapper_text, "Publish Date")
+            publish_date = parse_date(publish_date_raw)
 
-        # Close date — inside .landing div
+        # Close date
         close_date = None
         close_date_raw = ""
         landing = wrapper.select_one(".landing")
         if landing:
             text = landing.get_text()
-            date_match = re.search(r"(\d{2}/\d{2}/\d{4})", text)
+            date_match = self._find_date(text)
             if date_match:
-                close_date_raw = date_match.group(1)
+                close_date_raw = date_match
                 close_date = parse_date(close_date_raw)
+        if not close_date_raw:
+            close_date_raw = self._find_labeled_date(wrapper_text, "Deadline")
+            close_date = parse_date(close_date_raw)
 
         # Ref ID
         ref_el = wrapper.select_one("span[id*='lblTenderJoID']")
         ref_number = ref_el.get_text(strip=True) if ref_el else ""
+        if not ref_number:
+            ref_match = re.search(r"\bTGID\s+(\d+)\b", wrapper_text, flags=re.I)
+            if ref_match:
+                ref_number = ref_match.group(1)
 
         # Extract tdc_id from link as fallback ref
         if not ref_number and "tdc_id=" in href:
@@ -130,4 +143,29 @@ class TendersaScraper(BaseScraper):
             publish_date_raw=publish_date_raw,
             close_date_raw=close_date_raw,
             link=link,
+            description=wrapper_text[:500],
         )
+
+    @staticmethod
+    def _find_date(text: str) -> str:
+        date_match = re.search(
+            r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}|[A-Za-z]+\s+\d{1,2},\s+\d{4})",
+            text,
+        )
+        return date_match.group(1) if date_match else ""
+
+    def _find_labeled_date(self, text: str, label: str) -> str:
+        match = re.search(
+            rf"{re.escape(label)}\s+"
+            r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}|[A-Za-z]+\s+\d{1,2},\s+\d{4})",
+            text,
+            flags=re.I,
+        )
+        return match.group(1) if match else ""
+
+    def _full_url(self, href: str) -> str:
+        if not href:
+            return ""
+        if href.startswith("http"):
+            return href
+        return f"{self.BASE_URL}/{href.lstrip('/')}"
