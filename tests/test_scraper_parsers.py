@@ -2,6 +2,9 @@ import json
 import asyncio
 from pathlib import Path
 
+import httpx
+from tenacity import wait_none
+
 from scrapers.etimad import EtimadScraper
 from scrapers.ksagate import KSAGateScraper
 from scrapers.metenders import METendersScraper
@@ -118,3 +121,31 @@ def test_tendersontime_parser_extracts_record_fields():
     assert tender.ref_number == "TOT-001"
     assert tender.close_date is not None
     assert tender.link == "https://www.tendersontime.com/tender/ev-battery-diagnostics"
+
+
+def test_tendersontime_fetch_retries_transient_timeout():
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"tenderDetails": [{"ID": "TOT-RETRY"}]}
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = 0
+
+        async def post(self, url, content):
+            self.calls += 1
+            if self.calls == 1:
+                raise httpx.ConnectTimeout("temporary timeout")
+            return FakeResponse()
+
+    scraper = TendersOnTimeScraper()
+    scraper.RETRY_WAIT = wait_none()
+    client = FakeClient()
+
+    data = asyncio.run(scraper._fetch_page(client, 1))
+
+    assert client.calls == 2
+    assert data["tenderDetails"][0]["ID"] == "TOT-RETRY"
