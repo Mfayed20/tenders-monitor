@@ -54,7 +54,7 @@ playwright install chromium
 if [ ! -f ".env" ]; then
     cp .env.example .env
     echo ""
-    echo "IMPORTANT: Edit .env with your Gmail App Password and recipient emails."
+    echo "IMPORTANT: Edit .env with your Telegram bot token and chat ID."
     echo "  File: $(pwd)/.env"
 fi
 
@@ -65,8 +65,8 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Edit .env with your Gmail credentials"
-echo "  2. Test run:  python main.py --no-email"
+echo "  1. Edit .env with your Telegram credentials"
+echo "  2. Test run:  python main.py --dry-run --no-telegram"
 echo "  3. Full run:  python main.py"
 echo ""
 echo "Cron (Linux/Mac — run daily at 8 AM KSA / 5 AM UTC):"

@@ -62,7 +62,30 @@ python main.py
 
 # Purge dedup records older than 90 days
 python main.py --purge
+
+# Inspect a run without sending Telegram or marking tenders as seen
+python main.py --dry-run --no-telegram
+
+# Override runtime paths/windows
+python main.py --output-dir output --seen-db output/seen_tenders.db --run-window-hours 168 --close-window-days 30
 ```
+
+### Runtime Configuration
+
+Each CLI option can also be configured through environment variables:
+
+| Setting | CLI | Environment |
+|---|---|---|
+| Output directory | `--output-dir` | `TENDER_OUTPUT_DIR` |
+| Dedup SQLite path | `--seen-db` | `TENDER_SEEN_DB_PATH` |
+| Log level | `--log-level` | `TENDER_LOG_LEVEL` |
+| Publish window | `--run-window-hours` | `TENDER_RUN_WINDOW_HOURS` |
+| Closing window | `--close-window-days` | `TENDER_CLOSE_WINDOW_DAYS` |
+| Disabled scrapers | `--disable-scraper` | `TENDER_DISABLED_SCRAPERS` |
+| Telegram enabled | `--no-telegram` | `TENDER_TELEGRAM_ENABLED=false` |
+| Dry run | `--dry-run` | `TENDER_DRY_RUN=true` |
+
+`--disable-scraper` accepts site names such as `Etimad`, `TenderSA`, or `TendersInfo`; it can be repeated or comma-separated.
 
 ## Matching Rules
 
@@ -73,15 +96,17 @@ python main.py --purge
 
 ## Testing
 
-Install `pytest` in the virtual environment if needed:
+Install development dependencies in the virtual environment:
 
 ```bash
-python -m pip install pytest
+python -m pip install -r requirements-dev.txt
 ```
 
-Run the regression tests:
+Run the regression checks:
 
 ```bash
+python -m compileall -q .
+python -m ruff check .
 python -m pytest -q
 ```
 
@@ -95,6 +120,7 @@ All output is saved to the `output/` directory (gitignored):
 | `all_tenders.csv` | Cumulative master CSV |
 | `seen_tenders.db` | SQLite dedup database |
 | `tender_monitor.log` | Run logs |
+| `run_summary.json` | Machine-readable run status, scraper stats, filter diagnostics, outputs, and Telegram result |
 
 ## Project Structure
 
@@ -126,3 +152,19 @@ Use a cron job (Linux/Mac) or Task Scheduler (Windows) to run daily:
 # Run every day at 8:00 AM
 0 8 * * * cd /path/to/tenders-monitor && venv/bin/python main.py
 ```
+
+## GitHub Actions
+
+This repo includes:
+
+- `.github/workflows/ci.yml` — compile, lint, and test on push/PR.
+- `.github/workflows/daily-monitor.yml` — scheduled daily run at `05:00 UTC` / `08:00 Asia/Riyadh`, plus manual dispatch.
+
+Configure these repository secrets before enabling the daily workflow:
+
+```text
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+```
+
+The daily workflow restores and saves `output/seen_tenders.db` through the GitHub Actions cache, then uploads CSVs, logs, the dedup DB, and `run_summary.json` as 30-day artifacts.

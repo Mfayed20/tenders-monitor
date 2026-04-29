@@ -9,7 +9,6 @@ TenderID, Tender No, Tender Brief, Last Date of Bid Submission, etc.
 """
 
 import logging
-import re
 from html import unescape
 
 import httpx

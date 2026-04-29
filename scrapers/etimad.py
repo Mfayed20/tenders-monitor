@@ -9,7 +9,6 @@ Each tender has a title, ref number, dates, and status.
 Requires Playwright for JS rendering.
 """
 
-import asyncio
 import logging
 import re
 

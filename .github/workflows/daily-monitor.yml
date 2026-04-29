@@ -1,0 +1,78 @@
+name: Daily Tender Monitor
+
+on:
+  schedule:
+    # 08:00 Asia/Riyadh
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TENDER_OUTPUT_DIR: output
+      TENDER_SEEN_DB_PATH: output/seen_tenders.db
+      TENDER_LOG_LEVEL: INFO
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Restore dedup database
+        uses: actions/cache/restore@v4
+        with:
+          path: output/seen_tenders.db
+          key: seen-tenders-${{ github.run_id }}
+          restore-keys: |
+            seen-tenders-
+
+      - name: Run monitor
+        run: python main.py
+
+      - name: Ensure dedup database exists
+        if: always()
+        run: |
+          mkdir -p output
+          python - <<'PY'
+          from utils.dedup import is_seen, set_db_path
+
+          set_db_path("output/seen_tenders.db")
+          is_seen("__healthcheck__", "", "")
+          PY
+
+      - name: Save dedup database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: output/seen_tenders.db
+          key: seen-tenders-${{ github.run_id }}
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tender-monitor-output
+          path: |
+            output/tenders_*.csv
+            output/all_tenders.csv
+            output/tender_monitor.log
+            output/seen_tenders.db
+            output/run_summary.json
+          if-no-files-found: warn
+          retention-days: 30
