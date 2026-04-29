@@ -5,6 +5,12 @@ on:
     # 08:00 Asia/Riyadh
     - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      telegram_test:
+        description: "Send a Telegram smoke-test message instead of scraping"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   monitor:
@@ -43,7 +49,12 @@ jobs:
             seen-tenders-
 
       - name: Run monitor
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.telegram_test }}
         run: python main.py
+
+      - name: Send Telegram smoke test
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.telegram_test }}
+        run: python main.py --telegram-test
 
       - name: Ensure dedup database exists
         if: always()

@@ -14,6 +14,7 @@ If either env var is missing, notifications are silently skipped.
 
 import logging
 import os
+from datetime import datetime, timezone
 from html import escape as html_escape
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,23 @@ logger = logging.getLogger(__name__)
 _API_BASE = "https://api.telegram.org/bot{token}/sendMessage"
 _MAX_MESSAGE_LEN = 4096  # Telegram hard limit
 _MAX_DESCRIPTION_LEN = 180
+
+
+def _resolve_credentials(
+    bot_token: str | None = None,
+    chat_id: str | None = None,
+) -> tuple[str, str]:
+    token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    cid = chat_id or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    return token, cid
+
+
+def telegram_credentials_configured(
+    bot_token: str | None = None,
+    chat_id: str | None = None,
+) -> bool:
+    token, cid = _resolve_credentials(bot_token, chat_id)
+    return bool(token and cid)
 
 
 def _urgency_label(days_left: int | None) -> str:
@@ -140,11 +158,10 @@ async def send_telegram_alert(
     Returns:
         True if all messages sent successfully, False otherwise.
     """
-    token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    cid = chat_id or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    token, cid = _resolve_credentials(bot_token, chat_id)
 
     if not token or not cid:
-        logger.debug("Telegram not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID missing)")
+        logger.warning("Telegram not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID missing)")
         return False
 
     url = _API_BASE.format(token=token)
@@ -192,3 +209,41 @@ async def send_telegram_alert(
                 success = False
 
     return success
+
+
+async def send_telegram_test_message(
+    bot_token: str | None = None,
+    chat_id: str | None = None,
+) -> bool:
+    """Send a one-off smoke-test message to verify Telegram credentials."""
+    token, cid = _resolve_credentials(bot_token, chat_id)
+
+    if not token or not cid:
+        logger.warning("Telegram not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID missing)")
+        return False
+
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    text = (
+        "<b>KSA EV Tender Monitor test</b>\n"
+        f"Telegram is connected.\n"
+        f"Generated at: {_escape_telegram(generated_at)}"
+    )
+
+    url = _API_BASE.format(token=token)
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            resp = await client.post(url, json={
+                "chat_id": cid,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            })
+            resp.raise_for_status()
+            logger.info("Telegram test message sent")
+            return True
+        except httpx.HTTPStatusError as exc:
+            logger.error("Telegram API error: %s — %s", exc.response.status_code, exc.response.text)
+            return False
+        except Exception as exc:
+            logger.error("Telegram send failed: %s", exc)
+            return False

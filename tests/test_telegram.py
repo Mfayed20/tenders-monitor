@@ -1,6 +1,8 @@
+import asyncio
 from dataclasses import dataclass
 
-from utils.telegram_notifier import _build_messages
+from utils import telegram_notifier
+from utils.telegram_notifier import _build_messages, send_telegram_alert, telegram_credentials_configured
 
 
 @dataclass
@@ -15,6 +17,7 @@ class TenderRow:
     company_match: str
     matched_keywords: str
     description: str
+
 
 def test_build_messages_escapes_html_and_includes_scope():
     tender = TenderRow(
@@ -38,3 +41,46 @@ def test_build_messages_escapes_html_and_includes_scope():
     assert "Scope:" in message
     assert "عربي" in message
     assert 'href="https://example.com/tender?x=1&amp;y=2"' in message
+
+
+def test_telegram_credentials_configured(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+
+    assert telegram_credentials_configured() is False
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+
+    assert telegram_credentials_configured() is True
+
+
+def test_send_telegram_alert_posts_no_match_status(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def post(self, url, json):
+            calls.append((url, json))
+            return FakeResponse()
+
+    monkeypatch.setattr(telegram_notifier.httpx, "AsyncClient", FakeAsyncClient)
+
+    result = asyncio.run(send_telegram_alert([], "2026-04-29", bot_token="token", chat_id="123"))
+
+    assert result is True
+    assert len(calls) == 1
+    assert calls[0][1]["chat_id"] == "123"
+    assert "No new EV-related tenders found today" in calls[0][1]["text"]
