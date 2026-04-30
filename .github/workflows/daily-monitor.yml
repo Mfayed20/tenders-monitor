@@ -2,8 +2,8 @@ name: Daily Tender Monitor
 
 on:
   schedule:
-    # 08:17 Asia/Riyadh. Avoid minute 0 because GitHub can delay/drop top-of-hour schedules.
-    - cron: "17 5 * * *"
+    # 10:30 Asia/Riyadh (07:30 UTC).
+    - cron: "30 7 * * *"
   workflow_dispatch:
     inputs:
       telegram_test:
