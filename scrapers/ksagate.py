@@ -53,11 +53,14 @@ class KSAGateScraper(BaseScraper):
 
             async def _fetch_page(url, page_num):
                 try:
-                    response = await client.get(url)
-                    if response.status_code == 400:
-                        return []
-                    response.raise_for_status()
+                    response = await self.fetch_response_with_retry(client, "GET", url)
                     return response.json()
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code == 400:
+                        return []
+                    self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
+                    self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
+                    return []
                 except Exception as exc:
                     self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
                     self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
@@ -86,7 +89,7 @@ class KSAGateScraper(BaseScraper):
         if not title:
             return None
 
-        link = item.get("link", "")
+        link = self.build_source_url(str(item.get("link", "")), base_url=self.BASE_URL)
         publish_date_raw = str(item.get("date", "")).strip()
         publish_date = parse_date(publish_date_raw)
 

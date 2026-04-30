@@ -14,6 +14,7 @@ If either env var is missing, notifications are silently skipped.
 
 import logging
 import os
+import asyncio
 from datetime import datetime, timezone
 from html import escape as html_escape
 from typing import TYPE_CHECKING
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 _API_BASE = "https://api.telegram.org/bot{token}/sendMessage"
 _MAX_MESSAGE_LEN = 4096  # Telegram hard limit
 _MAX_DESCRIPTION_LEN = 180
+_TELEGRAM_RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
 
 
 def _resolve_credentials(
@@ -68,6 +70,68 @@ def _clip_text(text: str, limit: int = _MAX_DESCRIPTION_LEN) -> str:
     if len(cleaned) <= limit:
         return cleaned
     return cleaned[:limit].rsplit(" ", 1)[0] + "..."
+
+
+def _redact_token(text: str, token: str) -> str:
+    if not text:
+        return ""
+    return text.replace(token, "[REDACTED]") if token else text
+
+
+def _response_excerpt(response: httpx.Response, token: str, limit: int = 300) -> str:
+    return _redact_token(" ".join(response.text.split())[:limit], token)
+
+
+def _telegram_retry_after(response: httpx.Response, fallback: float) -> float:
+    try:
+        payload = response.json()
+    except ValueError:
+        return fallback
+
+    retry_after = payload.get("parameters", {}).get("retry_after")
+    try:
+        return max(float(retry_after), fallback)
+    except (TypeError, ValueError):
+        return fallback
+
+
+async def _post_telegram_message(
+    client: httpx.AsyncClient,
+    url: str,
+    payload: dict,
+    token: str,
+    *,
+    max_attempts: int = 3,
+) -> bool:
+    delay = 1.0
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code in _TELEGRAM_RETRYABLE_STATUSES and attempt < max_attempts:
+                delay = _telegram_retry_after(exc.response, delay)
+                logger.warning("Telegram API returned %s; retrying", status_code)
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            logger.error("Telegram API error: %s — %s", status_code, _response_excerpt(exc.response, token))
+            return False
+        except httpx.RequestError as exc:
+            if attempt < max_attempts:
+                logger.warning("Telegram request failed with %s; retrying", type(exc).__name__)
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            logger.error("Telegram request failed with %s", type(exc).__name__)
+            return False
+        except Exception as exc:
+            logger.error("Telegram send failed with %s", type(exc).__name__)
+            return False
+
+    return False
 
 
 def _format_tender(t: "TenderRow", index: int) -> str:
@@ -173,39 +237,43 @@ async def send_telegram_alert(
             f"Run complete. No new EV-related tenders found today."
         )
         async with httpx.AsyncClient(timeout=15) as client:
-            try:
-                resp = await client.post(url, json={
+            ok = await _post_telegram_message(
+                client,
+                url,
+                {
                     "chat_id": cid,
                     "text": no_match_msg,
                     "parse_mode": "HTML",
                     "disable_web_page_preview": True,
-                })
-                resp.raise_for_status()
+                },
+                token,
+            )
+            if ok:
                 logger.info("Telegram no-match status sent")
-            except Exception as exc:
-                logger.error("Telegram send failed: %s", exc)
-                return False
-        return True
+                return True
+            return False
 
     messages = _build_messages(tenders, date_str)
     success = True
 
     async with httpx.AsyncClient(timeout=15) as client:
-        for msg in messages:
-            try:
-                resp = await client.post(url, json={
+        for index, msg in enumerate(messages):
+            ok = await _post_telegram_message(
+                client,
+                url,
+                {
                     "chat_id": cid,
                     "text": msg,
                     "parse_mode": "HTML",
                     "disable_web_page_preview": True,
-                })
-                resp.raise_for_status()
+                },
+                token,
+            )
+            if ok:
                 logger.info("Telegram message sent (%d chars)", len(msg))
-            except httpx.HTTPStatusError as exc:
-                logger.error("Telegram API error: %s — %s", exc.response.status_code, exc.response.text)
-                success = False
-            except Exception as exc:
-                logger.error("Telegram send failed: %s", exc)
+                if index < len(messages) - 1:
+                    await asyncio.sleep(0.5)
+            else:
                 success = False
 
     return success
@@ -231,19 +299,18 @@ async def send_telegram_test_message(
 
     url = _API_BASE.format(token=token)
     async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            resp = await client.post(url, json={
+        ok = await _post_telegram_message(
+            client,
+            url,
+            {
                 "chat_id": cid,
                 "text": text,
                 "parse_mode": "HTML",
                 "disable_web_page_preview": True,
-            })
-            resp.raise_for_status()
+            },
+            token,
+        )
+        if ok:
             logger.info("Telegram test message sent")
             return True
-        except httpx.HTTPStatusError as exc:
-            logger.error("Telegram API error: %s — %s", exc.response.status_code, exc.response.text)
-            return False
-        except Exception as exc:
-            logger.error("Telegram send failed: %s", exc)
-            return False
+        return False

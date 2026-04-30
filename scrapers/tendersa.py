@@ -164,8 +164,4 @@ class TendersaScraper(BaseScraper):
         return match.group(1) if match else ""
 
     def _full_url(self, href: str) -> str:
-        if not href:
-            return ""
-        if href.startswith("http"):
-            return href
-        return f"{self.BASE_URL}/{href.lstrip('/')}"
+        return self.build_source_url(href, base_url=self.BASE_URL)

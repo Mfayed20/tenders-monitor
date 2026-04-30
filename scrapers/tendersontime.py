@@ -100,8 +100,7 @@ class TendersOnTimeScraper(BaseScraper):
                     close_date_str = value
 
             link = title_link.get("href", "").strip() if title_link else ""
-            if link and not link.startswith("http"):
-                link = f"{self.BASE_URL}/{link.lstrip('/')}"
+            link = self.build_source_url(link, base_url=self.BASE_URL)
 
             dedup_key = ref_number or link or title
             if dedup_key in seen_ids:
@@ -212,10 +211,7 @@ class TendersOnTimeScraper(BaseScraper):
 
         # Build detail URL
         detlink = record.get("detlink", "")
-        if detlink and not detlink.startswith("http"):
-            url = f"{self.BASE_URL}/{detlink.lstrip('/')}"
-        else:
-            url = detlink or ""
+        url = self.build_source_url(str(detlink), base_url=self.BASE_URL)
 
         return Tender(
             site=self.SITE_NAME,
