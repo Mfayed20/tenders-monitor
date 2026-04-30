@@ -76,6 +76,65 @@ def test_filter_dry_run_does_not_mark_seen(monkeypatch):
     assert marked == []
 
 
+def test_mark_seen_is_deferred_until_telegram_success(monkeypatch, tmp_path):
+    marked = []
+
+    async def fake_run_scrapers(scrapers):
+        tender = Tender(
+            site="Fixture",
+            title="Supply and installation of EV charging stations",
+            ref_number="DEFER-001",
+            description="Includes charger installation.",
+        )
+        stats = [main.ScraperRunStats(site="Fixture", needs_browser=False, raw_count=1)]
+        return [tender], stats
+
+    async def failed_send(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr(main, "run_scrapers", fake_run_scrapers)
+    monkeypatch.setattr(main, "send_telegram_alert", failed_send)
+    monkeypatch.setattr(main, "is_seen", lambda *args, **kwargs: False)
+    monkeypatch.setattr(main, "mark_seen", lambda *args, **kwargs: marked.append(args))
+
+    settings = main.RuntimeSettings(output_dir=tmp_path, telegram_enabled=True)
+    summary = asyncio.run(main.execute_run(settings))
+
+    assert summary["totals"]["matched"] == 1
+    assert summary["totals"]["dedup_marked"] == 0
+    assert marked == []
+
+
+def test_mark_seen_uses_raw_dedup_values_after_success(monkeypatch, tmp_path):
+    marked = []
+
+    async def fake_run_scrapers(scrapers):
+        tender = Tender(
+            site="Fixture",
+            title="=EV charging station rollout",
+            ref_number="RAW-001",
+            description="Includes charger installation.",
+        )
+        stats = [main.ScraperRunStats(site="Fixture", needs_browser=False, raw_count=1)]
+        return [tender], stats
+
+    async def successful_send(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr(main, "run_scrapers", fake_run_scrapers)
+    monkeypatch.setattr(main, "send_telegram_alert", successful_send)
+    monkeypatch.setattr(main, "is_seen", lambda *args, **kwargs: False)
+    monkeypatch.setattr(main, "mark_seen", lambda *args, **kwargs: marked.append(args))
+
+    settings = main.RuntimeSettings(output_dir=tmp_path, telegram_enabled=True)
+    summary = asyncio.run(main.execute_run(settings))
+
+    csv_text = next(tmp_path.glob("tenders_*.csv")).read_text(encoding="utf-8-sig")
+    assert "'=EV charging station rollout" in csv_text
+    assert summary["totals"]["dedup_marked"] == 1
+    assert marked == [("Fixture", "=EV charging station rollout", "RAW-001")]
+
+
 def test_run_scrapers_records_partial_failures():
     class GoodScraper:
         SITE_NAME = "Good"

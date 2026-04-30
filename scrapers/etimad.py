@@ -183,8 +183,4 @@ class EtimadScraper(BaseScraper):
         return result
 
     def _full_url(self, href: str) -> str:
-        if not href:
-            return ""
-        if href.startswith("http"):
-            return href
-        return f"https://tenders.etimad.sa{href}"
+        return self.build_source_url(href, base_url="https://tenders.etimad.sa")

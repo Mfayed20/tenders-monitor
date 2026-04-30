@@ -64,6 +64,8 @@ class TenderRow:
     company_match: str
     matched_keywords: str  # comma-separated keywords that triggered the match
     description: str  # tender description/scope (truncated)
+    dedup_title: str = ""
+    dedup_ref_number: str = ""
 
 
 @dataclass
@@ -145,6 +147,7 @@ CSV_HEADER = [
     "Site", "Title", "Ref#", "Published", "Deadline",
     "Days Left", "Link", "Match (Company)", "Keywords", "Description",
 ]
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
 
 # All scrapers to run
 SCRAPERS = [
@@ -348,7 +351,6 @@ async def run_scrapers(scrapers: list[Any] | None = None) -> tuple[list[Tender],
             browser = await pw.chromium.launch(
                 headless=True,
                 args=[
-                    "--no-sandbox",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                 ],
@@ -464,10 +466,6 @@ def filter_tenders(
             diagnostics.record_reject(t.site, "dedup")
             continue
 
-        # Mark as seen
-        if not dry_run:
-            mark_seen(t.site, t.title, t.ref_number)
-
         # Calculate days until closing
         days_left = None
         if t.close_date:
@@ -485,11 +483,23 @@ def filter_tenders(
             company_match=result.company,
             matched_keywords=", ".join(result.matched_keywords[:5]),
             description=t.description[:200] if t.description else "",
+            dedup_title=t.title,
+            dedup_ref_number=t.ref_number,
         ))
         diagnostics.record_match(t.site)
 
     diagnostics.matched_total = len(matched)
     return matched, diagnostics
+
+
+def _csv_safe(value: Any) -> Any:
+    """Prevent spreadsheet formula injection for untrusted scraped strings."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.lstrip()
+    if stripped.startswith(CSV_FORMULA_PREFIXES):
+        return "'" + value
+    return value
 
 
 def write_csv(
@@ -504,12 +514,12 @@ def write_csv(
     csv_path = out_dir / f"tenders_{date_str}.csv"
 
     def _to_row(t):
-        return [
+        return [_csv_safe(value) for value in [
             t.site, t.title, t.ref_number,
             t.publish_date, t.close_date,
             t.days_left if t.days_left is not None else "N/A",
             t.link, t.company_match, t.matched_keywords, t.description,
-        ]
+        ]]
 
     # 1. Daily CSV snapshot (overwrite on each run to avoid stale same-day rows)
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
@@ -538,6 +548,16 @@ def write_csv(
 
     logger.info("CSV written: %s (%d rows), master: %s", csv_path.name, len(tenders), master_path.name)
     return csv_path
+
+
+def mark_tenders_seen(tenders: list[TenderRow]) -> int:
+    """Mark delivered tenders as seen after durable outputs/alerts have succeeded."""
+    marked = 0
+    for tender in tenders:
+        ref_number = tender.dedup_ref_number or ("" if tender.ref_number == "N/A" else tender.ref_number)
+        mark_seen(tender.site, tender.dedup_title or tender.title, ref_number)
+        marked += 1
+    return marked
 
 
 def _counter_map_to_dict(counters: dict[str, Counter[str]]) -> dict[str, dict[str, int]]:
@@ -576,6 +596,7 @@ def build_run_summary(
     diagnostics: FilterDiagnostics,
     csv_path: Path,
     telegram_sent: bool,
+    dedup_marked: int = 0,
 ) -> dict[str, Any]:
     rejected_total = sum(sum(counter.values()) for counter in diagnostics.reject_counts.values())
     scraper_errors = [stats.error for stats in scrape_stats if stats.error]
@@ -598,6 +619,7 @@ def build_run_summary(
             "raw": diagnostics.raw_total,
             "matched": diagnostics.matched_total,
             "rejected": rejected_total,
+            "dedup_marked": dedup_marked,
         },
         "scrapers": _build_scraper_summary(scrape_stats, diagnostics),
         "filter_reject_counts": _counter_map_to_dict(diagnostics.reject_counts),
@@ -706,6 +728,14 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
     else:
         logger.info("Telegram alert disabled")
 
+    dedup_marked = 0
+    should_mark_seen = matched and not settings.dry_run and (not settings.telegram_enabled or tg_ok)
+    if should_mark_seen:
+        dedup_marked = mark_tenders_seen(matched)
+        logger.info("Marked %d delivered tenders as seen", dedup_marked)
+    elif matched and not settings.dry_run:
+        logger.warning("Dedup marking deferred because Telegram delivery did not succeed")
+
     summary = build_run_summary(
         date_str=date_str,
         settings=settings,
@@ -713,6 +743,7 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
         diagnostics=diagnostics,
         csv_path=csv_path,
         telegram_sent=tg_ok,
+        dedup_marked=dedup_marked,
     )
     summary_path = write_run_summary(summary, settings.output_dir)
 

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class METendersScraper(BaseScraper):
     SITE_NAME = "METenders"
     BASE_URL = "https://metenders.com"
+    ALLOWED_HOSTS = ("metenders.com", "www.metenders.com")
     NEEDS_BROWSER = True
 
     # Pages with actual tender listings
@@ -180,9 +181,4 @@ class METendersScraper(BaseScraper):
         return tenders
 
     def _full_url(self, href: str) -> str:
-        if not href:
-            return ""
-        if href.startswith("http"):
-            return href
-        href = href.lstrip("./")
-        return f"{self.BASE_URL}/{href}"
+        return self.build_source_url(href.lstrip("./"), base_url=self.BASE_URL)

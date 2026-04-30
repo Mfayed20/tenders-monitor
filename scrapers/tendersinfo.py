@@ -55,8 +55,12 @@ class TendersInfoScraper(BaseScraper):
                 start = (page_num - 1) * self.PAGE_SIZE
                 self.logger.info("Fetching TendersInfo Saudi page %d", page_num)
                 try:
-                    response = await client.post(self.API_URL, data=self._build_payload(page_num, start))
-                    response.raise_for_status()
+                    response = await self.fetch_response_with_retry(
+                        client,
+                        "POST",
+                        self.API_URL,
+                        data=self._build_payload(page_num, start),
+                    )
                     return page_num, response.json()
                 except Exception as exc:
                     self.logger.exception("Failed to fetch TendersInfo Saudi page %d", page_num)
@@ -127,9 +131,7 @@ class TendersInfoScraper(BaseScraper):
         publish_date_str = self._strip_html(record.get("date_c", ""))
 
         # Build the detail URL
-        url = record.get("url", "")
-        if url and not url.startswith("http"):
-            url = f"{self.BASE_URL}/{url.lstrip('/')}"
+        url = self.build_source_url(str(record.get("url", "")), base_url=self.BASE_URL)
 
         description_parts = [
             self._strip_html(record.get("sector_name", "") or record.get("tender_sector", "")),
