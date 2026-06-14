@@ -27,7 +27,9 @@ ARABIC_NUMERALS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 KSA_TZ = timezone(timedelta(hours=3))
 
 _AMBIGUOUS_NUMERIC_DATE_RE = re.compile(
-    r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\s*$"
+    r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})"
+    r"(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)?\s*$",
+    re.IGNORECASE,
 )
 
 
@@ -64,8 +66,12 @@ def parse_date(date_str: str) -> datetime | None:
         return None
 
     cleaned = _transliterate_arabic(date_str.strip())
-    # Remove common prefixes/suffixes
-    cleaned = re.sub(r"(هـ|ه|م|AM|PM|ص|م\.)", "", cleaned, flags=re.IGNORECASE).strip()
+    # Normalize meridiem markers before stripping calendar suffixes.
+    cleaned = re.sub(r"(\d{1,2}:\d{2})\s*ص\.?", r"\1 AM", cleaned)
+    cleaned = re.sub(r"(\d{1,2}:\d{2})\s*م\.?", r"\1 PM", cleaned)
+    # Remove common Hijri/Gregorian suffixes without discarding AM/PM.
+    cleaned = re.sub(r"(?<=\d)\s*(?:هـ|ه)(?=\s|$)", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"(?<=\d{4})\s*م\.?(?=\s|$)", "", cleaned).strip()
     # Remove day names
     cleaned = re.sub(
         r"(الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)",
@@ -97,7 +103,7 @@ def parse_date(date_str: str) -> datetime | None:
     for fmt in [
         "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y",
         "%d %B %Y", "%B %d, %Y", "%d %b %Y",
-        "%Y/%m/%d", "%d/%m/%Y %H:%M",
+        "%Y/%m/%d", "%d/%m/%Y %H:%M", "%d/%m/%Y %I:%M %p",
     ]:
         try:
             dt = datetime.strptime(cleaned, fmt)

@@ -11,11 +11,15 @@ Requires Playwright for JS rendering.
 
 import logging
 import re
+from dataclasses import replace
+from datetime import datetime
+from urllib.parse import quote
 
 from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Tender
-from utils.dates import parse_date
+from utils.dates import KSA_TZ, parse_date
+from utils.keywords import match_tender
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +29,13 @@ class EtimadScraper(BaseScraper):
     BASE_URL = "https://tenders.etimad.sa/Tender/AllTendersForVisitor"
     NEEDS_BROWSER = True
 
-    MAX_PAGES = 3
+    MAX_PAGES = 15
+    GREGORIAN_DATE_RE = re.compile(
+        r"(?P<date>\d{1,2}/\d{1,2}/20\d{2}|\d{4}-\d{1,2}-\d{1,2})"
+        r"(?:\s+\d{1,2}/\d{1,2}/1\d{3})?"
+        r"(?:\s+(?P<time>\d{1,2}:\d{2})(?:\s*(?P<meridiem>AM|PM))?)?",
+        re.IGNORECASE,
+    )
 
     async def scrape(self, browser=None) -> list[Tender]:
         if browser is None:
@@ -63,6 +73,7 @@ class EtimadScraper(BaseScraper):
                     self.logger.info("No tenders found on page %d — stopping", page_num)
                     break
 
+                page_tenders = await self._enrich_page_tenders(page, page_tenders)
                 tenders.extend(page_tenders)
                 self.logger.info("Found %d tenders on page %d", len(page_tenders), page_num)
 
@@ -107,7 +118,7 @@ class EtimadScraper(BaseScraper):
             # Extract tender ID from URL
             tender_id = ""
             if "STenderId=" in href:
-                tender_id = href.split("STenderId=")[-1]
+                tender_id = href.split("STenderId=")[-1].strip()
 
             if not tender_id:
                 continue
@@ -132,15 +143,125 @@ class EtimadScraper(BaseScraper):
             tenders.append(Tender(
                 site=self.SITE_NAME,
                 title=title,
-                ref_number=tender_id[:20],
+                ref_number=tender_id,
                 publish_date=tender_data.get("publish_date"),
                 close_date=tender_data.get("close_date"),
                 publish_date_raw=tender_data.get("publish_date_raw", ""),
                 close_date_raw=tender_data.get("close_date_raw", ""),
                 link=link,
+                raw_data={"etimad_stender_id": tender_id},
             ))
 
         return tenders
+
+    async def _enrich_page_tenders(self, page, tenders: list[Tender]) -> list[Tender]:
+        """Fetch detail pages for official reference numbers and deadline data."""
+        enriched: list[Tender] = []
+        for tender in tenders:
+            if not tender.link or not self._should_enrich_detail(tender):
+                enriched.append(tender)
+                continue
+
+            try:
+                html = await self._load_detail_page(page, tender.link)
+                enriched.append(self._parse_detail_page(html, tender))
+            except Exception as exc:
+                self.logger.warning("Failed to enrich Etimad tender detail %s: %s", tender.link, exc)
+                enriched.append(tender)
+
+        return enriched
+
+    def _should_enrich_detail(self, tender: Tender) -> bool:
+        return match_tender(tender.title, tender.description).matched
+
+    async def _load_detail_page(self, page, url: str) -> str:
+        """Load the basic detail tab plus the schedule tab."""
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        await page.wait_for_selector("body", state="attached", timeout=15000)
+        await page.wait_for_timeout(1000)
+        detail_html = await page.content()
+
+        try:
+            await page.locator("#tenderDatesTab").click(timeout=5000)
+            await page.wait_for_selector("#d-2.active, #d-2.show", state="attached", timeout=5000)
+            await page.wait_for_timeout(1000)
+            detail_html += "\n" + await page.content()
+        except Exception as exc:
+            self.logger.debug("Etimad schedule tab was not available for %s: %s", url, exc)
+
+        return detail_html
+
+    def _parse_detail_page(self, html: str, tender: Tender) -> Tender:
+        """Parse official Etimad fields from a tender detail page."""
+        lines = self._text_lines(html)
+        title = self._value_after_label(lines, "اسم المنافسة") or tender.title
+        competition_number = self._value_after_label(lines, "رقم المنافسة")
+        official_ref = self._value_after_label(lines, "الرقم المرجعي")
+        description = self._value_after_label(lines, "الغرض من المنافسة") or tender.description
+        status = self._value_after_label(lines, "حالة المنافسة")
+        close_date_raw = self._date_after_label(lines, "آخر موعد لتقديم العروض")
+        close_date = self._parse_etimad_gregorian_date(close_date_raw) if close_date_raw else None
+
+        raw_data = dict(tender.raw_data)
+        if competition_number:
+            raw_data["etimad_competition_number"] = competition_number
+        if status:
+            raw_data["etimad_status"] = status
+
+        return replace(
+            tender,
+            title=title,
+            ref_number=official_ref or tender.ref_number,
+            close_date=close_date or tender.close_date,
+            close_date_raw=close_date_raw or tender.close_date_raw,
+            description=description,
+            raw_data=raw_data,
+        )
+
+    def _text_lines(self, html: str) -> list[str]:
+        soup = BeautifulSoup(html, "html.parser")
+        return [line.strip() for line in soup.get_text("\n", strip=True).splitlines() if line.strip()]
+
+    def _value_after_label(self, lines: list[str], label: str) -> str:
+        for index, line in enumerate(lines[:-1]):
+            if line == label:
+                return lines[index + 1].strip()
+        return ""
+
+    def _date_after_label(self, lines: list[str], label: str) -> str:
+        value = ""
+        for index, line in enumerate(lines[:-1]):
+            if line != label:
+                continue
+            block = " ".join(lines[index + 1:index + 5])
+            extracted = self._extract_gregorian_datetime(block)
+            if extracted:
+                value = extracted
+        return value
+
+    def _extract_gregorian_datetime(self, value: str) -> str:
+        match = self.GREGORIAN_DATE_RE.search(value or "")
+        if not match:
+            return ""
+
+        parts = [match.group("date")]
+        if match.group("time"):
+            parts.append(match.group("time"))
+        if match.group("meridiem"):
+            parts.append(match.group("meridiem").upper())
+        return " ".join(parts)
+
+    def _parse_etimad_gregorian_date(self, value: str) -> datetime | None:
+        parsed = parse_date(value)
+        if parsed:
+            return parsed
+
+        for fmt in ("%d/%m/%Y %I:%M %p", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(value, fmt).replace(tzinfo=KSA_TZ)
+            except ValueError:
+                continue
+        return None
 
     def _extract_context(self, soup: BeautifulSoup, href: str) -> dict:
         """Try to extract dates from the DOM near a tender link."""
@@ -183,4 +304,12 @@ class EtimadScraper(BaseScraper):
         return result
 
     def _full_url(self, href: str) -> str:
-        return self.build_source_url(href, base_url="https://tenders.etimad.sa")
+        return self.build_source_url(self._encode_stender_id(href), base_url="https://tenders.etimad.sa")
+
+    def _encode_stender_id(self, href: str) -> str:
+        marker = "STenderId="
+        if marker not in href:
+            return href
+
+        before, value = href.split(marker, 1)
+        return before + marker + quote(value.strip(), safe="%*=@")
