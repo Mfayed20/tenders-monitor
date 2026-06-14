@@ -245,6 +245,26 @@ def test_ksagate_fetch_page_retries_ssl_verify_failure_without_recording_error(m
     assert scraper.run_errors == []
 
 
+def test_ksagate_fetch_page_handles_unexpected_json_payload(monkeypatch):
+    class FakeResponse:
+        def json(self):
+            return {"message": "temporarily unavailable"}
+
+    scraper = KSAGateScraper()
+
+    async def fake_fetch(client, method, url):
+        return FakeResponse()
+
+    monkeypatch.setattr(scraper, "fetch_response_with_retry", fake_fetch)
+
+    data = asyncio.run(scraper._fetch_page(object(), "https://ksatendersgate.com/wp-json/wp/v2/tenders", 1))
+
+    assert data == []
+    assert scraper.run_errors == [
+        "KSAGate API page 1 returned unexpected payload: dict"
+    ]
+
+
 def test_tendersa_parser_extracts_wrapper_fields():
     tenders = TendersaScraper()._parse_page(_read_text("tendersa.html"))
 
