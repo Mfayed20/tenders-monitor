@@ -76,7 +76,7 @@ class KSAGateScraper(BaseScraper):
     async def _fetch_page(self, client, url: str, page_num: int):
         try:
             response = await self.fetch_response_with_retry(client, "GET", url)
-            return response.json()
+            return self._json_records_from_response(response, page_num)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 400:
                 return []
@@ -98,11 +98,21 @@ class KSAGateScraper(BaseScraper):
         try:
             async with self._build_client(verify=False) as client:
                 response = await self.fetch_response_with_retry(client, "GET", url)
-                return response.json()
+                return self._json_records_from_response(response, page_num)
         except Exception as exc:
             self.logger.exception("Failed to fetch KSAGate API page %d with SSL fallback", page_num)
             self.record_run_error(f"Failed to fetch KSAGate API page {page_num} with SSL fallback", exc)
             return None
+
+    def _json_records_from_response(self, response, page_num: int) -> list:
+        data = response.json()
+        if isinstance(data, list):
+            return data
+
+        payload_type = type(data).__name__
+        self.logger.warning("KSAGate API page %d returned unexpected payload: %s", page_num, payload_type)
+        self.record_run_error(f"KSAGate API page {page_num} returned unexpected payload: {payload_type}")
+        return []
 
     @staticmethod
     def _is_ssl_verify_error(exc: Exception) -> bool:
