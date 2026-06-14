@@ -2,8 +2,10 @@ name: Daily Tender Monitor
 
 on:
   schedule:
-    # 10:30 Asia/Riyadh (07:30 UTC).
-    - cron: "30 7 * * *"
+    # 07:00, 12:00, and 17:00 Asia/Riyadh (UTC+3).
+    - cron: "0 4 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       telegram_test:

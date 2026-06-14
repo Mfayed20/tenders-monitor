@@ -5,12 +5,14 @@ from pathlib import Path
 import httpx
 from tenacity import wait_none
 
+from scrapers.base import Tender
 from scrapers.etimad import EtimadScraper
 from scrapers.ksagate import KSAGateScraper
 from scrapers.metenders import METendersScraper
 from scrapers.tendersa import TendersaScraper
 from scrapers.tendersinfo import TendersInfoScraper
 from scrapers.tendersontime import TendersOnTimeScraper
+from utils.dates import KSA_TZ
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -61,6 +63,139 @@ def test_etimad_listing_load_tolerates_non_idle_network():
     assert page.goto_wait_until == "domcontentloaded"
     assert "DetailsForVisitor" in html
     assert scraper.run_errors == []
+
+
+def test_etimad_detail_loader_clicks_schedule_tab_by_id():
+    class FakeLocator:
+        def __init__(self, page, selector):
+            self.page = page
+            self.selector = selector
+
+        async def click(self, timeout):
+            self.page.clicked_selectors.append((self.selector, timeout))
+
+    class FakePage:
+        def __init__(self):
+            self.clicked_selectors = []
+            self.waited_selectors = []
+            self.content_calls = 0
+
+        async def goto(self, url, wait_until, timeout):
+            self.goto_wait_until = wait_until
+
+        async def wait_for_selector(self, selector, state, timeout):
+            self.waited_selectors.append((selector, state, timeout))
+
+        async def wait_for_timeout(self, timeout):
+            return None
+
+        async def content(self):
+            self.content_calls += 1
+            return f"<html>detail {self.content_calls}</html>"
+
+        def locator(self, selector):
+            return FakeLocator(self, selector)
+
+    page = FakePage()
+    html = asyncio.run(EtimadScraper()._load_detail_page(page, "https://example.com/tender"))
+
+    assert page.clicked_selectors == [("#tenderDatesTab", 5000)]
+    assert ("#d-2.active, #d-2.show", "attached", 5000) in page.waited_selectors
+    assert html == "<html>detail 1</html>\n<html>detail 2</html>"
+
+
+def test_etimad_detail_parser_extracts_reference_description_and_deadline():
+    base_tender = Tender(
+        site="Etimad",
+        title="encrypted listing title",
+        ref_number="*@@**jOil8b8AtY",
+        link="https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=*@@**jOil8b8AtY%20Iy58gwqV6A==",
+    )
+
+    tender = EtimadScraper()._parse_detail_page(_read_text("etimad_detail.html"), base_tender)
+
+    assert tender.title == "توريد وتركيب شاحن سياره كهربائي"
+    assert tender.ref_number == "260539007202"
+    assert tender.description == "توريد وتركيب شاحن سياره كهربائ"
+    assert tender.close_date_raw == "14/06/2026 10:00 AM"
+    assert tender.close_date is not None
+    assert tender.close_date.year == 2026
+    assert tender.close_date.month == 6
+    assert tender.close_date.day == 14
+    assert tender.close_date.hour == 10
+    assert tender.close_date.tzinfo == KSA_TZ
+    assert tender.raw_data["etimad_competition_number"] == "ORN0000019467"
+    assert tender.raw_data["etimad_status"] == "معتمدة"
+
+
+def test_etimad_detail_parser_treats_ambiguous_deadlines_as_dayfirst():
+    base_tender = Tender(site="Etimad", title="توريد وتركيب شاحن كهربائي", ref_number="1")
+    html = _read_text("etimad_detail.html").replace(
+        "14/06/2026 28/12/1447 10:00 AM",
+        "05/07/2026 20/01/1448 02:30 PM",
+    )
+
+    tender = EtimadScraper()._parse_detail_page(html, base_tender)
+
+    assert tender.close_date_raw == "05/07/2026 02:30 PM"
+    assert tender.close_date is not None
+    assert tender.close_date.year == 2026
+    assert tender.close_date.month == 7
+    assert tender.close_date.day == 5
+    assert tender.close_date.hour == 14
+    assert tender.close_date.tzinfo == KSA_TZ
+
+
+def test_etimad_detail_parser_combines_split_deadline_nodes():
+    base_tender = Tender(site="Etimad", title="توريد وتركيب شاحن كهربائي", ref_number="1")
+    html = _read_text("etimad_detail.html").replace(
+        "<div>14/06/2026 28/12/1447 10:00 AM</div>",
+        "<div>14/06/2026</div><div>28/12/1447</div><div>10:00 AM</div>",
+    )
+
+    tender = EtimadScraper()._parse_detail_page(html, base_tender)
+
+    assert tender.close_date_raw == "14/06/2026 10:00 AM"
+    assert tender.close_date is not None
+    assert tender.close_date.hour == 10
+
+
+def test_etimad_detail_parser_reads_concatenated_basic_and_schedule_html():
+    base_tender = Tender(site="Etimad", title="", ref_number="1")
+    basic_html, schedule_html = _read_text("etimad_detail.html").split(
+        "<div>آخر موعد لتقديم العروض</div>"
+    )
+    html = basic_html + "</body></html>\n<html><body><div>آخر موعد لتقديم العروض</div>" + schedule_html
+
+    tender = EtimadScraper()._parse_detail_page(html, base_tender)
+
+    assert tender.title == "توريد وتركيب شاحن سياره كهربائي"
+    assert tender.close_date_raw == "14/06/2026 10:00 AM"
+    assert tender.close_date is not None
+
+
+def test_etimad_detail_urls_are_encoded_for_browser_and_alert_links():
+    url = EtimadScraper()._full_url(
+        "/Tender/DetailsForVisitor?STenderId=*@@**jOil8b8AtY Iy58gwqV6A=="
+    )
+
+    assert " " not in url
+    assert "STenderId=*@@**jOil8b8AtY%20Iy58gwqV6A==" in url
+
+
+def test_etimad_listing_scan_reaches_beyond_first_three_pages():
+    assert EtimadScraper.MAX_PAGES >= 10
+
+
+def test_etimad_detail_enrichment_is_limited_to_ev_relevant_rows():
+    scraper = EtimadScraper()
+
+    assert scraper._should_enrich_detail(
+        Tender(site="Etimad", title="توريد وتركيب شاحن سياره كهربائي", ref_number="1")
+    )
+    assert not scraper._should_enrich_detail(
+        Tender(site="Etimad", title="إعادة تصميم وتأثيث المكاتب", ref_number="2")
+    )
 
 
 def test_ksagate_parser_extracts_api_item_fields():

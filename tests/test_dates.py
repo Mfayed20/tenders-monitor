@@ -14,6 +14,14 @@ def test_parse_iso_date_still_works():
     assert parsed.strftime("%Y-%m-%d") == "2026-04-05"
 
 
+def test_parse_dayfirst_pm_time_preserves_afternoon_hour():
+    parsed = parse_date("14/06/2026 02:30 PM")
+
+    assert parsed is not None
+    assert parsed.hour == 14
+    assert parsed.minute == 30
+
+
 def test_future_publish_date_is_not_new():
     future_date = datetime.now(KSA_TZ) + timedelta(days=1)
 

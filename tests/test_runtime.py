@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 
 import main
 from scrapers.base import BaseScraper, Tender
@@ -40,6 +41,14 @@ def test_settings_rejects_unknown_scraper():
         assert "unknown disabled scraper" in str(exc)
     else:
         raise AssertionError("settings_from_args should reject unknown scraper names")
+
+
+def test_daily_monitor_schedule_runs_before_common_morning_deadlines():
+    workflow = Path(".github/workflows/daily-monitor.yml").read_text(encoding="utf-8")
+
+    assert 'cron: "0 4 * * *"' in workflow
+    assert 'cron: "0 9 * * *"' in workflow
+    assert 'cron: "0 14 * * *"' in workflow
 
 
 def test_dedup_database_path_is_injectable(tmp_path):
