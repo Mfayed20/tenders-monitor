@@ -28,22 +28,19 @@ class KSAGateScraper(BaseScraper):
 
     PER_PAGE = 100
     MAX_PAGES = 3
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
+    }
 
     async def scrape(self, browser=None) -> list[Tender]:
         tenders = []
 
-        async with httpx.AsyncClient(
-            timeout=30,
-            follow_redirects=True,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept": "application/json",
-            },
-        ) as client:
+        async with self._build_client() as client:
             # Fetch all pages concurrently
             urls = [
                 f"{self.API_URL}?per_page={self.PER_PAGE}&page={p}"
@@ -51,24 +48,9 @@ class KSAGateScraper(BaseScraper):
             ]
             self.logger.info("Fetching KSAGate API pages 1-%d concurrently", self.MAX_PAGES)
 
-            async def _fetch_page(url, page_num):
-                try:
-                    response = await self.fetch_response_with_retry(client, "GET", url)
-                    return response.json()
-                except httpx.HTTPStatusError as exc:
-                    if exc.response.status_code == 400:
-                        return []
-                    self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
-                    self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
-                    return []
-                except Exception as exc:
-                    self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
-                    self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
-                    return []
-
             import asyncio
             results = await asyncio.gather(
-                *[_fetch_page(url, i + 1) for i, url in enumerate(urls)]
+                *[self._fetch_page(client, url, i + 1) for i, url in enumerate(urls)]
             )
 
             for page_num, data in enumerate(results, 1):
@@ -82,6 +64,50 @@ class KSAGateScraper(BaseScraper):
 
         self.logger.info("KSAGate total: %d tenders scraped", len(tenders))
         return tenders
+
+    def _build_client(self, *, verify: bool = True) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            timeout=30,
+            follow_redirects=True,
+            headers=self.HEADERS,
+            verify=verify,
+        )
+
+    async def _fetch_page(self, client, url: str, page_num: int):
+        try:
+            response = await self.fetch_response_with_retry(client, "GET", url)
+            return response.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 400:
+                return []
+            self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
+            self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
+            return []
+        except Exception as exc:
+            if self._is_ssl_verify_error(exc):
+                fallback_data = await self._fetch_page_without_ssl_verify(url, page_num)
+                if fallback_data is not None:
+                    return fallback_data
+
+            self.logger.exception("Failed to fetch KSAGate API page %d", page_num)
+            self.record_run_error(f"Failed to fetch KSAGate API page {page_num}", exc)
+            return []
+
+    async def _fetch_page_without_ssl_verify(self, url: str, page_num: int):
+        self.logger.warning("Retrying KSAGate API page %d without TLS certificate verification", page_num)
+        try:
+            async with self._build_client(verify=False) as client:
+                response = await self.fetch_response_with_retry(client, "GET", url)
+                return response.json()
+        except Exception as exc:
+            self.logger.exception("Failed to fetch KSAGate API page %d with SSL fallback", page_num)
+            self.record_run_error(f"Failed to fetch KSAGate API page {page_num} with SSL fallback", exc)
+            return None
+
+    @staticmethod
+    def _is_ssl_verify_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "certificate_verify_failed" in message or "self-signed certificate" in message
 
     def _parse_api_item(self, item: dict) -> Tender | None:
         """Parse a tender from the WordPress REST API response."""

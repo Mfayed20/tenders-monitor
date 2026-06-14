@@ -207,6 +207,44 @@ def test_ksagate_parser_extracts_api_item_fields():
     assert "Public EV charger deployment" in tender.description
 
 
+def test_ksagate_fetch_page_retries_ssl_verify_failure_without_recording_error(monkeypatch):
+    class FakeResponse:
+        def json(self):
+            return [{"id": 1}]
+
+    class FallbackClient:
+        pass
+
+    class FakeClientContext:
+        async def __aenter__(self):
+            return FallbackClient()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    scraper = KSAGateScraper()
+    primary_client = object()
+    fallback_verify_values = []
+
+    def fake_build_client(*, verify=True):
+        fallback_verify_values.append(verify)
+        return FakeClientContext()
+
+    async def fake_fetch(client, method, url):
+        if client is primary_client:
+            raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate")
+        return FakeResponse()
+
+    monkeypatch.setattr(scraper, "_build_client", fake_build_client)
+    monkeypatch.setattr(scraper, "fetch_response_with_retry", fake_fetch)
+
+    data = asyncio.run(scraper._fetch_page(primary_client, "https://ksatendersgate.com/wp-json/wp/v2/tenders", 1))
+
+    assert data == [{"id": 1}]
+    assert fallback_verify_values == [False]
+    assert scraper.run_errors == []
+
+
 def test_tendersa_parser_extracts_wrapper_fields():
     tenders = TendersaScraper()._parse_page(_read_text("tendersa.html"))
 
