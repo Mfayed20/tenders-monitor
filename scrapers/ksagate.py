@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class KSAGateScraper(BaseScraper):
     SITE_NAME = "KSATendersGate"
     BASE_URL = "https://ksatendersgate.com"
-    API_URL = "https://ksatendersgate.com/wp-json/wp/v2/tenders"
+    API_URL = "http://ksatendersgate.com/wp-json/wp/v2/tenders"
     NEEDS_BROWSER = False
 
     PER_PAGE = 100

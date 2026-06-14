@@ -207,6 +207,11 @@ def test_ksagate_parser_extracts_api_item_fields():
     assert "Public EV charger deployment" in tender.description
 
 
+def test_ksagate_api_uses_plain_http_while_source_links_stay_https():
+    assert KSAGateScraper.API_URL.startswith("http://ksatendersgate.com/")
+    assert KSAGateScraper.BASE_URL.startswith("https://")
+
+
 def test_ksagate_fetch_page_retries_ssl_verify_failure_without_recording_error(monkeypatch):
     class FakeResponse:
         def json(self):
