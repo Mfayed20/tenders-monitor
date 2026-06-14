@@ -219,6 +219,25 @@ def test_tendersa_parser_extracts_wrapper_fields():
     assert "Riyadh" in tenders[0].description
 
 
+def test_tendersa_parser_extracts_current_tg2_cards():
+    tenders = TendersaScraper()._parse_page(_read_text("tendersa_tg2.html"))
+
+    assert len(tenders) == 1
+    assert tenders[0].site == "TenderSA"
+    assert tenders[0].title == "Operation and maintenance of an EV charging depot"
+    assert tenders[0].ref_number == "1262313"
+    assert tenders[0].link == "https://www.tendersa.com/TenderDetails.aspx?tdc_id=1262313"
+    assert tenders[0].publish_date is not None
+    assert tenders[0].publish_date_raw == "June 14, 2026"
+    assert tenders[0].close_date is not None
+    assert tenders[0].close_date_raw == "July 21, 2026"
+    assert "Maintenance and Operation" in tenders[0].description
+
+
+def test_tendersa_wait_selector_matches_current_cards():
+    assert "article.tg2-card" in TendersaScraper.WAIT_SELECTOR
+
+
 def test_tendersinfo_parser_extracts_record_fields():
     scraper = TendersInfoScraper()
     tender = scraper._parse_record(_read_json("tendersinfo_record.json"))
