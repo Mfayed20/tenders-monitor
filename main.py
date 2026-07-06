@@ -717,14 +717,16 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
         append_master=not settings.dry_run,
     )
 
-    # Step 4: Send Telegram alert (always — matches or no matches)
+    # Step 4: Send Telegram alert only when there are matched tenders.
     tg_ok = False
-    if settings.telegram_enabled:
+    if settings.telegram_enabled and matched:
         tg_ok = await send_telegram_alert(matched, date_str)
         if tg_ok:
             logger.info("Telegram alert sent successfully")
         else:
             logger.debug("Telegram alert skipped or failed (check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)")
+    elif settings.telegram_enabled:
+        logger.info("No matched tenders; Telegram alert skipped")
     else:
         logger.info("Telegram alert disabled")
 

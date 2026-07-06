@@ -221,6 +221,7 @@ async def send_telegram_alert(
 
     Returns:
         True if all messages sent successfully, False otherwise.
+        Empty tender lists are not sent and return False.
     """
     token, cid = _resolve_credentials(bot_token, chat_id)
 
@@ -230,28 +231,9 @@ async def send_telegram_alert(
 
     url = _API_BASE.format(token=token)
 
-    # Always send a status message, even when no matches found
     if not tenders:
-        no_match_msg = (
-            f"<b>KSA EV Tenders - {_escape_telegram(date_str)}</b>\n"
-            f"Run complete. No new EV-related tenders found today."
-        )
-        async with httpx.AsyncClient(timeout=15) as client:
-            ok = await _post_telegram_message(
-                client,
-                url,
-                {
-                    "chat_id": cid,
-                    "text": no_match_msg,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True,
-                },
-                token,
-            )
-            if ok:
-                logger.info("Telegram no-match status sent")
-                return True
-            return False
+        logger.info("No matched tenders; Telegram digest not sent")
+        return False
 
     messages = _build_messages(tenders, date_str)
     success = True
