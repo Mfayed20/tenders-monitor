@@ -13,7 +13,7 @@ Built for two companies:
 3. Uses company-specific matching for Climatech Charger and EVS so generic electrical, software, and non-EV supply tenders do not trigger alerts
 4. Deduplicates against previously seen tenders (SQLite)
 5. Writes results to a latest-run daily snapshot CSV and a cumulative master CSV
-6. Sends a Telegram digest to the configured chat, even when no new matches are found
+6. Sends a Telegram digest to the configured chat only when new matches are found
 
 ## Sources
 
@@ -57,7 +57,7 @@ To get these values:
 ## Usage
 
 ```bash
-# Full run: scrape + filter + CSV + Telegram
+# Full run: scrape + filter + CSV + Telegram when matches are found
 python main.py
 
 # Purge dedup records older than 90 days

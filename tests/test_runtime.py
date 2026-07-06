@@ -144,6 +144,39 @@ def test_mark_seen_uses_raw_dedup_values_after_success(monkeypatch, tmp_path):
     assert marked == [("Fixture", "=EV charging station rollout", "RAW-001")]
 
 
+def test_execute_run_skips_telegram_when_no_tenders_match(monkeypatch, tmp_path):
+    sent_messages = []
+
+    async def fake_run_scrapers(scrapers):
+        tender = Tender(
+            site="Fixture",
+            title="Office furniture supply",
+            ref_number="NO-MATCH-001",
+            description="Desks and chairs.",
+        )
+        stats = [main.ScraperRunStats(site="Fixture", needs_browser=False, raw_count=1)]
+        return [tender], stats
+
+    async def fake_send_telegram(*args, **kwargs):
+        sent_messages.append((args, kwargs))
+        return True
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setattr(main, "run_scrapers", fake_run_scrapers)
+    monkeypatch.setattr(main, "send_telegram_alert", fake_send_telegram)
+
+    settings = main.RuntimeSettings(output_dir=tmp_path, telegram_enabled=True)
+    summary = asyncio.run(main.execute_run(settings))
+
+    persisted = json.loads((tmp_path / "run_summary.json").read_text(encoding="utf-8"))
+
+    assert sent_messages == []
+    assert summary["totals"]["matched"] == 0
+    assert summary["telegram"] == {"enabled": True, "configured": True, "sent": False}
+    assert persisted["telegram"] == summary["telegram"]
+
+
 def test_run_scrapers_records_partial_failures():
     class GoodScraper:
         SITE_NAME = "Good"

@@ -55,7 +55,7 @@ def test_telegram_credentials_configured(monkeypatch):
     assert telegram_credentials_configured() is True
 
 
-def test_send_telegram_alert_posts_no_match_status(monkeypatch):
+def test_send_telegram_alert_skips_empty_digest(monkeypatch):
     calls = []
 
     class FakeResponse:
@@ -80,7 +80,5 @@ def test_send_telegram_alert_posts_no_match_status(monkeypatch):
 
     result = asyncio.run(send_telegram_alert([], "2026-04-29", bot_token="token", chat_id="123"))
 
-    assert result is True
-    assert len(calls) == 1
-    assert calls[0][1]["chat_id"] == "123"
-    assert "No new EV-related tenders found today" in calls[0][1]["text"]
+    assert result is False
+    assert calls == []
