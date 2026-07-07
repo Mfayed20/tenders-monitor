@@ -34,6 +34,33 @@ class METendersScraper(BaseScraper):
         "https://metenders.com/newely_added_tenders.asp",
         "https://metenders.com/SaudiArabia/SaudiArabia-Riyadh-Jeddah-Construction-Buildings-Tenders-and-Projects.asp",
     ]
+    SAUDI_TEXT_MARKERS = (
+        "saudi",
+        "saudi arabia",
+        "kingdom of saudi arabia",
+        "ksa",
+        "riyadh",
+        "jeddah",
+        "dammam",
+        "makkah",
+        "mecca",
+        "madinah",
+        "medina",
+        "khobar",
+        "al khobar",
+        "dhahran",
+        "jubail",
+        "yanbu",
+        "tabuk",
+        "qassim",
+        "abha",
+        "jazan",
+        "jizan",
+        "najran",
+        "hail",
+        "ha'il",
+        "taif",
+    )
 
     async def scrape(self, browser=None) -> list[Tender]:
         if browser is None:
@@ -64,7 +91,7 @@ class METendersScraper(BaseScraper):
                     self.record_run_error(f"Failed to fetch METenders URL {url}", exc)
                     continue
 
-                page_tenders = self._parse_page(html)
+                page_tenders = self._parse_page(html, source_url=url)
                 # Deduplicate across pages
                 for t in page_tenders:
                     key = t.ref_number or t.title
@@ -92,27 +119,31 @@ class METendersScraper(BaseScraper):
         await page.wait_for_timeout(1000)
         return await page.content()
 
-    def _parse_page(self, html: str) -> list[Tender]:
+    def _parse_page(self, html: str, source_url: str | None = None) -> list[Tender]:
         """Parse tenders from METenders HTML using tbody blocks."""
         soup = BeautifulSoup(html, "lxml")
         tenders = []
+        source_is_saudi = self._is_saudi_listing_url(source_url)
 
         # Find the main data table
         table = soup.select_one("table.hover-eff") or soup.select_one("table.top_table21")
         if not table:
             # Fallback: search entire page for tender links
-            return self._parse_fallback(soup)
+            return self._parse_fallback(soup, source_url=source_url)
 
         # Each tender is in its own <tbody>
         tbodies = table.find_all("tbody")
         for tbody in tbodies:
+            if source_url and not source_is_saudi and not self._has_saudi_marker(tbody.get_text(" ", strip=True)):
+                continue
+
             tender = self._parse_tbody(tbody)
             if tender:
                 tenders.append(tender)
 
         # If no tbody-based tenders found, try fallback
         if not tenders:
-            tenders = self._parse_fallback(soup)
+            tenders = self._parse_fallback(soup, source_url=source_url)
 
         return tenders
 
@@ -158,17 +189,29 @@ class METendersScraper(BaseScraper):
             description=description,
         )
 
-    def _parse_fallback(self, soup) -> list[Tender]:
+    def _parse_fallback(self, soup, source_url: str | None = None) -> list[Tender]:
         """Fallback: just find all RequestInfo links on the page."""
         tenders = []
         links = soup.select('a[href*="RequestInfo.asp"]')
         seen = set()
+        source_is_saudi = self._is_saudi_listing_url(source_url)
 
         for link_el in links:
             title = link_el.get_text(strip=True)
             href = link_el.get("href", "")
             if not title or len(title) < 10 or title in seen:
                 continue
+            if source_url and not source_is_saudi:
+                container = (
+                    link_el.find_parent("tbody")
+                    or link_el.find_parent("tr")
+                    or link_el.find_parent("li")
+                    or link_el.find_parent("td")
+                )
+                if not container:
+                    continue
+                if not self._has_saudi_marker(container.get_text(" ", strip=True)):
+                    continue
             seen.add(title)
 
             tenders.append(Tender(
@@ -182,3 +225,12 @@ class METendersScraper(BaseScraper):
 
     def _full_url(self, href: str) -> str:
         return self.build_source_url(href.lstrip("./"), base_url=self.BASE_URL)
+
+    def _is_saudi_listing_url(self, source_url: str | None) -> bool:
+        if not source_url:
+            return False
+        return "/saudiarabia/" in source_url.lower()
+
+    def _has_saudi_marker(self, text: str) -> bool:
+        normalized = re.sub(r"\s+", " ", text.lower())
+        return any(re.search(rf"\b{re.escape(marker)}\b", normalized) for marker in self.SAUDI_TEXT_MARKERS)

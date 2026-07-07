@@ -57,6 +57,16 @@ def test_evs_firmware_and_hv_battery_scope_matches():
     assert any(keyword in result.matched_keywords for keyword in ["firmware", "battery module", "bms"])
 
 
+def test_generic_electric_motor_repair_does_not_match_evs():
+    result = match_tender(
+        "Electric Motor Repair",
+        "Repair and Rehabilitation of an Electric Motor.",
+    )
+
+    assert result.matched is False
+    assert result.company == ""
+
+
 def test_generic_software_development_does_not_match():
     result = match_tender(
         "Website development and mobile application development for customer portal",

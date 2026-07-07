@@ -331,6 +331,84 @@ def test_metenders_parser_extracts_table_body_fields():
     assert "[New]" in tenders[0].description
 
 
+def test_metenders_global_listing_rejects_non_saudi_rows():
+    html = """
+    <html>
+      <body>
+        <table class="hover-eff">
+          <tbody>
+            <tr>
+              <td><a href="RequestInfo.asp?TID=1254676">Electric Motor Repair</a></td>
+            </tr>
+            <tr>
+              <td><font color="Red">PRN1254676-ME</font></td>
+            </tr>
+            <tr>
+              <td><b>Description:</b> Repair and Rehabilitation of an Electric Motor.</td>
+            </tr>
+            <tr>
+              <td>Country: Egypt</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+    """
+
+    tenders = METendersScraper()._parse_page(
+        html,
+        source_url="https://metenders.com/newely_added_tenders.asp",
+    )
+
+    assert tenders == []
+
+
+def test_metenders_global_listing_keeps_saudi_rows():
+    html = """
+    <html>
+      <body>
+        <table class="hover-eff">
+          <tbody>
+            <tr>
+              <td><a href="RequestInfo.asp?TID=ME002">EV fleet maintenance contract</a></td>
+            </tr>
+            <tr>
+              <td><font color="Red">ME-002</font></td>
+            </tr>
+            <tr>
+              <td><b>Description:</b> Diagnostics and service package for electric vehicles.</td>
+            </tr>
+            <tr>
+              <td>Country: Saudi Arabia</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+    """
+
+    tenders = METendersScraper()._parse_page(
+        html,
+        source_url="https://metenders.com/newely_added_tenders.asp",
+    )
+
+    assert len(tenders) == 1
+    assert tenders[0].ref_number == "ME-002"
+
+
+def test_metenders_saudi_listing_keeps_rows_without_inline_country():
+    tenders = METendersScraper()._parse_page(
+        _read_text("metenders.html"),
+        source_url=(
+            "https://metenders.com/SaudiArabia/"
+            "SaudiArabia-Riyadh-Jeddah-Construction-Buildings-Tenders-and-Projects.asp"
+        ),
+    )
+
+    assert len(tenders) == 1
+    assert tenders[0].ref_number == "ME-001"
+
+
 def test_tendersontime_parser_extracts_record_fields():
     tender = TendersOnTimeScraper()._parse_record(_read_json("tendersontime_record.json"))
 

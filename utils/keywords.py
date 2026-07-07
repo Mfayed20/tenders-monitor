@@ -119,7 +119,6 @@ _DEFAULT_EVS_COMPOUND_AR = [
 
 _DEFAULT_EVS_EV_ANCHORS_EN = [
     "ev",
-    "electric",
     "electric vehicle",
     "electric vehicles",
     "electric fleet",
