@@ -1,0 +1,171 @@
+2026-10-29 12:40:21,627 [INFO] main: ============================================================
+2026-10-29 12:40:21,627 [INFO] main: KSA EV Tender Monitor — Run started: 2026-10-29
+2026-10-29 12:40:21,627 [INFO] main: Settings: output_dir=/home/runner/work/tenders-monitor/tenders-monitor/probe/out seen_db=/home/runner/work/tenders-monitor/tenders-monitor/probe/out/seen.db run_window_hours=720 close_window_days=365 telegram_enabled=False dry_run=True disabled_scrapers=none
+2026-10-29 12:40:21,627 [INFO] main: ============================================================
+2026-10-29 12:40:21,627 [INFO] main: Step 1: Scraping 6 enabled sites...
+2026-10-29 12:40:21,651 [INFO] scraper.KSATendersGate: Fetching KSAGate API pages 1-3 concurrently
+2026-10-29 12:40:21,659 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 1
+2026-10-29 12:40:21,676 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 1
+2026-10-29 12:40:21,677 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 2
+2026-10-29 12:40:21,677 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 3
+2026-10-29 12:40:21,678 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 4
+2026-10-29 12:40:21,678 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 5
+2026-10-29 12:40:21,679 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 6
+2026-10-29 12:40:21,679 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 7
+2026-10-29 12:40:21,679 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 8
+2026-10-29 12:40:21,680 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 9
+2026-10-29 12:40:21,680 [INFO] scraper.TendersInfo: Fetching TendersInfo Saudi page 10
+2026-10-29 12:40:22,038 [INFO] scraper.TendersOnTime: TendersOnTime page 1: 10 records
+2026-10-29 12:40:22,040 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 2
+2026-10-29 12:40:22,320 [INFO] scraper.TendersOnTime: TendersOnTime page 2: 10 records
+2026-10-29 12:40:22,321 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 3
+2026-10-29 12:40:22,583 [INFO] scraper.TendersOnTime: TendersOnTime page 3: 10 records
+2026-10-29 12:40:22,584 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 4
+2026-10-29 12:40:22,856 [INFO] scraper.TendersOnTime: TendersOnTime page 4: 10 records
+2026-10-29 12:40:22,857 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 5
+2026-10-29 12:40:23,131 [INFO] scraper.TendersOnTime: TendersOnTime page 5: 10 records
+2026-10-29 12:40:23,132 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 6
+2026-10-29 12:40:23,399 [INFO] scraper.TendersOnTime: TendersOnTime page 6: 10 records
+2026-10-29 12:40:23,400 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 7
+2026-10-29 12:40:23,667 [INFO] scraper.TendersOnTime: TendersOnTime page 7: 10 records
+2026-10-29 12:40:23,668 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 8
+2026-10-29 12:40:23,928 [INFO] scraper.TendersOnTime: TendersOnTime page 8: 10 records
+2026-10-29 12:40:23,929 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 9
+2026-10-29 12:40:24,199 [INFO] scraper.TendersOnTime: TendersOnTime page 9: 10 records
+2026-10-29 12:40:24,199 [INFO] scraper.TendersOnTime: Fetching TendersOnTime page 10
+2026-10-29 12:40:24,331 [INFO] scraper.TendersInfo: TendersInfo Saudi page 1: 50 records (total: 1519)
+2026-10-29 12:40:24,342 [INFO] scraper.TendersInfo: TendersInfo Saudi page 2: 50 records (total: 1519)
+2026-10-29 12:40:24,351 [INFO] scraper.TendersInfo: TendersInfo Saudi page 3: 50 records (total: 1519)
+2026-10-29 12:40:24,360 [INFO] scraper.TendersInfo: TendersInfo Saudi page 4: 50 records (total: 1519)
+2026-10-29 12:40:24,370 [INFO] scraper.TendersInfo: TendersInfo Saudi page 5: 50 records (total: 1519)
+2026-10-29 12:40:24,381 [INFO] scraper.TendersInfo: TendersInfo Saudi page 6: 50 records (total: 1519)
+2026-10-29 12:40:24,390 [INFO] scraper.TendersInfo: TendersInfo Saudi page 7: 50 records (total: 1519)
+2026-10-29 12:40:24,399 [INFO] scraper.TendersInfo: TendersInfo Saudi page 8: 50 records (total: 1519)
+2026-10-29 12:40:24,409 [INFO] scraper.TendersInfo: TendersInfo Saudi page 9: 50 records (total: 1519)
+2026-10-29 12:40:24,416 [INFO] scraper.TendersInfo: TendersInfo Saudi page 10: 50 records (total: 1519)
+2026-10-29 12:40:24,424 [INFO] scraper.TendersInfo: TendersInfo total: 452 tenders scraped
+2026-10-29 12:40:24,462 [INFO] scraper.TendersOnTime: TendersOnTime page 10: 10 records
+2026-10-29 12:40:24,463 [INFO] scraper.TendersOnTime: TendersOnTime total: 100 tenders scraped
+2026-10-29 12:40:25,430 [INFO] scraper.KSATendersGate: Found 100 tenders on page 1
+2026-10-29 12:40:25,633 [INFO] scraper.KSATendersGate: Found 100 tenders on page 2
+2026-10-29 12:40:25,877 [INFO] scraper.KSATendersGate: Found 100 tenders on page 3
+2026-10-29 12:40:25,878 [INFO] scraper.KSATendersGate: KSAGate total: 299 tenders scraped
+2026-10-29 12:40:26,359 [INFO] main: Playwright browser launched
+2026-10-29 12:40:26,437 [INFO] scraper.TenderSA: Fetching TenderSA search page
+2026-10-29 12:40:26,438 [INFO] scraper.METenders: Fetching METenders: https://metenders.com/newely_added_tenders.asp
+2026-10-29 12:40:28,935 [INFO] scraper.METenders: Found 9 tenders on newely_added_tenders.asp
+2026-10-29 12:40:28,935 [INFO] scraper.METenders: Fetching METenders: https://metenders.com/SaudiArabia/SaudiArabia-Riyadh-Jeddah-Construction-Buildings-Tenders-and-Projects.asp
+2026-10-29 12:40:32,728 [INFO] scraper.TenderSA: Found 30 tenders on TenderSA
+2026-10-29 12:40:32,734 [INFO] scraper.TenderSA: TenderSA total: 30 tenders scraped
+2026-10-29 12:40:41,024 [WARNING] scraper.METenders: METenders tender links were not attached within timeout: Page.wait_for_selector: Timeout 12000ms exceeded.
+Call log:
+  - waiting for locator("a[href*=\"RequestInfo.asp\"]")
+
+2026-10-29 12:40:42,029 [INFO] scraper.METenders: Found 0 tenders on SaudiArabia-Riyadh-Jeddah-Construction-Buildings-Tenders-and-Projects.asp
+2026-10-29 12:40:42,038 [INFO] scraper.METenders: METenders total: 8 tenders scraped
+2026-10-29 12:40:44,486 [INFO] scraper.Etimad: Etimad JSON page 1: 24 tenders (oldest 2026-10-29 14:00:06+03:00)
+2026-10-29 12:40:50,175 [INFO] scraper.Etimad: Etimad JSON page 2: 24 tenders (oldest 2026-10-29 13:23:08+03:00)
+2026-10-29 12:40:55,880 [INFO] scraper.Etimad: Etimad JSON page 3: 24 tenders (oldest 2026-10-29 12:22:10+03:00)
+2026-10-29 12:41:01,281 [INFO] scraper.Etimad: Etimad JSON page 4: 24 tenders (oldest 2026-10-29 10:35:45+03:00)
+2026-10-29 12:41:06,704 [INFO] scraper.Etimad: Etimad JSON page 5: 24 tenders (oldest 2026-10-29 09:36:16+03:00)
+2026-10-29 12:41:12,202 [INFO] scraper.Etimad: Etimad JSON page 6: 24 tenders (oldest 2026-10-28 19:19:34+03:00)
+2026-10-29 12:41:17,559 [INFO] scraper.Etimad: Etimad JSON page 7: 24 tenders (oldest 2026-10-28 15:10:37+03:00)
+2026-10-29 12:41:23,059 [INFO] scraper.Etimad: Etimad JSON page 8: 24 tenders (oldest 2026-10-28 13:34:01+03:00)
+2026-10-29 12:41:28,458 [INFO] scraper.Etimad: Etimad JSON page 9: 24 tenders (oldest 2026-10-28 12:21:34+03:00)
+2026-10-29 12:41:33,858 [INFO] scraper.Etimad: Etimad JSON page 10: 24 tenders (oldest 2026-10-28 10:47:41+03:00)
+2026-10-29 12:41:39,283 [INFO] scraper.Etimad: Etimad JSON page 11: 24 tenders (oldest 2026-10-28 08:47:31+03:00)
+2026-10-29 12:41:44,936 [INFO] scraper.Etimad: Etimad JSON page 12: 24 tenders (oldest 2026-10-28 02:56:17+03:00)
+2026-10-29 12:41:50,418 [INFO] scraper.Etimad: Etimad JSON page 13: 24 tenders (oldest 2026-10-27 15:55:35+03:00)
+2026-10-29 12:41:56,068 [INFO] scraper.Etimad: Etimad JSON page 14: 24 tenders (oldest 2026-10-27 14:32:58+03:00)
+2026-10-29 12:42:01,759 [INFO] scraper.Etimad: Etimad JSON page 15: 24 tenders (oldest 2026-10-27 13:25:13+03:00)
+2026-10-29 12:42:07,276 [INFO] scraper.Etimad: Etimad JSON page 16: 24 tenders (oldest 2026-10-27 11:53:47+03:00)
+2026-10-29 12:42:12,818 [INFO] scraper.Etimad: Etimad JSON page 17: 24 tenders (oldest 2026-10-27 10:20:17+03:00)
+2026-10-29 12:42:18,255 [INFO] scraper.Etimad: Etimad JSON page 18: 24 tenders (oldest 2026-10-27 08:20:42+03:00)
+2026-10-29 12:42:23,855 [INFO] scraper.Etimad: Etimad JSON page 19: 24 tenders (oldest 2026-10-26 15:34:57+03:00)
+2026-10-29 12:42:29,278 [INFO] scraper.Etimad: Etimad JSON page 20: 24 tenders (oldest 2026-10-26 13:52:23+03:00)
+2026-10-29 12:42:34,707 [INFO] scraper.Etimad: Etimad JSON page 21: 24 tenders (oldest 2026-10-26 12:59:38+03:00)
+2026-10-29 12:42:40,522 [INFO] scraper.Etimad: Etimad JSON page 22: 24 tenders (oldest 2026-10-26 12:00:16+03:00)
+2026-10-29 12:42:45,986 [INFO] scraper.Etimad: Etimad JSON page 23: 24 tenders (oldest 2026-10-26 10:45:35+03:00)
+2026-10-29 12:42:51,442 [INFO] scraper.Etimad: Etimad JSON page 24: 24 tenders (oldest 2026-10-25 21:36:48+03:00)
+2026-10-29 12:42:57,094 [INFO] scraper.Etimad: Etimad JSON page 25: 24 tenders (oldest 2026-10-25 14:14:32+03:00)
+2026-10-29 12:43:02,561 [INFO] scraper.Etimad: Etimad JSON page 26: 24 tenders (oldest 2026-10-25 12:33:46+03:00)
+2026-10-29 12:43:07,976 [INFO] scraper.Etimad: Etimad JSON page 27: 24 tenders (oldest 2026-10-25 11:00:46+03:00)
+2026-10-29 12:43:13,700 [INFO] scraper.Etimad: Etimad JSON page 28: 24 tenders (oldest 2026-10-25 08:21:00+03:00)
+2026-10-29 12:43:19,165 [INFO] scraper.Etimad: Etimad JSON page 29: 24 tenders (oldest 2026-10-22 18:22:41+03:00)
+2026-10-29 12:43:24,586 [INFO] scraper.Etimad: Etimad JSON page 30: 24 tenders (oldest 2026-10-22 15:05:36+03:00)
+2026-10-29 12:43:30,192 [INFO] scraper.Etimad: Etimad JSON page 31: 24 tenders (oldest 2026-10-22 14:08:56+03:00)
+2026-10-29 12:43:35,754 [INFO] scraper.Etimad: Etimad JSON page 32: 24 tenders (oldest 2026-10-22 12:41:25+03:00)
+2026-10-29 12:43:41,236 [INFO] scraper.Etimad: Etimad JSON page 33: 24 tenders (oldest 2026-10-22 11:06:48+03:00)
+2026-10-29 12:43:46,783 [INFO] scraper.Etimad: Etimad JSON page 34: 24 tenders (oldest 2026-10-22 09:36:29+03:00)
+2026-10-29 12:43:52,479 [INFO] scraper.Etimad: Etimad JSON page 35: 24 tenders (oldest 2026-10-21 19:23:50+03:00)
+2026-10-29 12:43:58,036 [INFO] scraper.Etimad: Etimad JSON page 36: 24 tenders (oldest 2026-10-21 15:35:15+03:00)
+2026-10-29 12:44:03,524 [INFO] scraper.Etimad: Etimad JSON page 37: 24 tenders (oldest 2026-10-21 13:32:43+03:00)
+2026-10-29 12:44:09,183 [INFO] scraper.Etimad: Etimad JSON page 38: 24 tenders (oldest 2026-10-21 11:42:20+03:00)
+2026-10-29 12:44:14,862 [INFO] scraper.Etimad: Etimad JSON page 39: 24 tenders (oldest 2026-10-21 10:36:36+03:00)
+2026-10-29 12:44:20,338 [INFO] scraper.Etimad: Etimad JSON page 40: 24 tenders (oldest 2026-10-21 09:08:13+03:00)
+2026-10-29 12:44:25,988 [INFO] scraper.Etimad: Etimad JSON page 41: 24 tenders (oldest 2026-10-21 08:29:05+03:00)
+2026-10-29 12:44:31,455 [INFO] scraper.Etimad: Etimad JSON page 42: 24 tenders (oldest 2026-10-20 16:29:09+03:00)
+2026-10-29 12:44:37,285 [INFO] scraper.Etimad: Etimad JSON page 43: 24 tenders (oldest 2026-10-20 14:45:32+03:00)
+2026-10-29 12:44:42,807 [INFO] scraper.Etimad: Etimad JSON page 44: 24 tenders (oldest 2026-10-20 12:54:25+03:00)
+2026-10-29 12:44:48,423 [INFO] scraper.Etimad: Etimad JSON page 45: 24 tenders (oldest 2026-10-20 11:44:15+03:00)
+2026-10-29 12:44:54,008 [INFO] scraper.Etimad: Etimad JSON page 46: 24 tenders (oldest 2026-10-20 10:59:42+03:00)
+2026-10-29 12:44:59,418 [INFO] scraper.Etimad: Etimad JSON page 47: 24 tenders (oldest 2026-10-20 09:23:05+03:00)
+2026-10-29 12:45:05,146 [INFO] scraper.Etimad: Etimad JSON page 48: 24 tenders (oldest 2026-10-19 18:35:23+03:00)
+2026-10-29 12:45:10,710 [INFO] scraper.Etimad: Etimad JSON page 49: 24 tenders (oldest 2026-10-19 16:35:09+03:00)
+2026-10-29 12:45:16,096 [INFO] scraper.Etimad: Etimad JSON page 50: 24 tenders (oldest 2026-10-19 15:10:22+03:00)
+2026-10-29 12:45:21,595 [INFO] scraper.Etimad: Etimad JSON page 51: 24 tenders (oldest 2026-10-19 13:54:47+03:00)
+2026-10-29 12:45:27,163 [INFO] scraper.Etimad: Etimad JSON page 52: 24 tenders (oldest 2026-10-19 12:53:34+03:00)
+2026-10-29 12:45:32,708 [INFO] scraper.Etimad: Etimad JSON page 53: 24 tenders (oldest 2026-10-19 11:43:13+03:00)
+2026-10-29 12:45:38,602 [INFO] scraper.Etimad: Etimad JSON page 54: 24 tenders (oldest 2026-10-19 10:32:26+03:00)
+2026-10-29 12:45:44,220 [INFO] scraper.Etimad: Etimad JSON page 55: 24 tenders (oldest 2026-10-19 08:30:44+03:00)
+2026-10-29 12:45:49,867 [INFO] scraper.Etimad: Etimad JSON page 56: 24 tenders (oldest 2026-10-18 15:47:31+03:00)
+2026-10-29 12:45:55,671 [INFO] scraper.Etimad: Etimad JSON page 57: 24 tenders (oldest 2026-10-15 17:54:43+03:00)
+2026-10-29 12:46:01,203 [INFO] scraper.Etimad: Etimad JSON page 58: 24 tenders (oldest 2026-10-15 14:03:55+03:00)
+2026-10-29 12:46:06,670 [INFO] scraper.Etimad: Etimad JSON page 59: 24 tenders (oldest 2026-10-15 13:18:43+03:00)
+2026-10-29 12:46:12,115 [INFO] scraper.Etimad: Etimad JSON page 60: 24 tenders (oldest 2026-10-15 12:24:41+03:00)
+2026-10-29 12:46:18,018 [INFO] scraper.Etimad: Etimad JSON page 61: 24 tenders (oldest 2026-10-15 10:38:21+03:00)
+2026-10-29 12:46:23,682 [INFO] scraper.Etimad: Etimad JSON page 62: 24 tenders (oldest 2026-10-15 09:20:18+03:00)
+2026-10-29 12:46:29,473 [INFO] scraper.Etimad: Etimad JSON page 63: 24 tenders (oldest 2026-10-14 15:25:07+03:00)
+2026-10-29 12:46:35,511 [INFO] scraper.Etimad: Etimad JSON page 64: 24 tenders (oldest 2026-10-14 14:04:00+03:00)
+2026-10-29 12:46:41,217 [INFO] scraper.Etimad: Etimad JSON page 65: 24 tenders (oldest 2026-10-14 13:00:22+03:00)
+2026-10-29 12:46:46,888 [INFO] scraper.Etimad: Etimad JSON page 66: 24 tenders (oldest 2026-10-14 10:57:29+03:00)
+2026-10-29 12:46:52,253 [INFO] scraper.Etimad: Etimad JSON page 67: 24 tenders (oldest 2026-10-14 09:17:35+03:00)
+2026-10-29 12:46:58,134 [INFO] scraper.Etimad: Etimad JSON page 68: 24 tenders (oldest 2026-10-14 07:27:42+03:00)
+2026-10-29 12:47:03,646 [INFO] scraper.Etimad: Etimad JSON page 69: 24 tenders (oldest 2026-10-13 15:21:54+03:00)
+2026-10-29 12:47:09,348 [INFO] scraper.Etimad: Etimad JSON page 70: 24 tenders (oldest 2026-10-13 13:01:48+03:00)
+2026-10-29 12:47:14,721 [INFO] scraper.Etimad: Etimad JSON page 71: 24 tenders (oldest 2026-10-13 11:12:38+03:00)
+2026-10-29 12:47:20,121 [INFO] scraper.Etimad: Etimad JSON page 72: 24 tenders (oldest 2026-10-13 09:41:25+03:00)
+2026-10-29 12:47:25,934 [INFO] scraper.Etimad: Etimad JSON page 73: 24 tenders (oldest 2026-10-13 00:34:30+03:00)
+2026-10-29 12:47:35,337 [INFO] scraper.Etimad: Etimad JSON page 74: 24 tenders (oldest 2026-10-12 16:24:37+03:00)
+2026-10-29 12:47:40,778 [INFO] scraper.Etimad: Etimad JSON page 75: 24 tenders (oldest 2026-10-12 15:09:59+03:00)
+2026-10-29 12:47:46,582 [INFO] scraper.Etimad: Etimad JSON page 76: 24 tenders (oldest 2026-10-12 12:58:47+03:00)
+2026-10-29 12:47:52,119 [INFO] scraper.Etimad: Etimad JSON page 77: 24 tenders (oldest 2026-10-12 11:22:50+03:00)
+2026-10-29 12:47:57,643 [INFO] scraper.Etimad: Etimad JSON page 78: 24 tenders (oldest 2026-10-12 09:49:23+03:00)
+2026-10-29 12:48:03,765 [INFO] scraper.Etimad: Etimad JSON page 79: 24 tenders (oldest 2026-10-12 07:46:54+03:00)
+2026-10-29 12:48:09,304 [INFO] scraper.Etimad: Etimad JSON page 80: 24 tenders (oldest 2026-10-11 20:31:21+03:00)
+2026-10-29 12:48:14,850 [INFO] scraper.Etimad: Etimad JSON page 81: 24 tenders (oldest 2026-10-11 14:19:18+03:00)
+2026-10-29 12:48:20,317 [INFO] scraper.Etimad: Etimad JSON page 82: 24 tenders (oldest 2026-10-11 12:22:53+03:00)
+2026-10-29 12:48:26,469 [INFO] scraper.Etimad: Etimad JSON page 83: 24 tenders (oldest 2026-10-11 10:56:05+03:00)
+2026-10-29 12:48:31,912 [INFO] scraper.Etimad: Etimad JSON page 84: 24 tenders (oldest 2026-10-11 09:14:05+03:00)
+2026-10-29 12:48:37,429 [INFO] scraper.Etimad: Etimad JSON page 85: 24 tenders (oldest 2026-10-09 20:13:17+03:00)
+2026-10-29 12:48:42,928 [INFO] scraper.Etimad: Etimad JSON page 86: 24 tenders (oldest 2026-10-08 16:06:13+03:00)
+2026-10-29 12:48:48,369 [INFO] scraper.Etimad: Etimad JSON page 87: 24 tenders (oldest 2026-10-08 14:21:58+03:00)
+2026-10-29 12:48:48,369 [INFO] scraper.Etimad: Etimad total: 2084 tenders read from the JSON list
+2026-10-29 12:48:48,407 [INFO] main: Playwright browser closed
+2026-10-29 12:48:48,407 [INFO] main: Total raw tenders scraped: 2973
+2026-10-29 12:48:48,407 [INFO] main: Step 2: Filtering tenders...
+2026-10-29 12:48:53,765 [INFO] main: Matched tenders after filtering: 1
+2026-10-29 12:48:53,765 [INFO] main: Filtering diagnostics: raw=2973 matched=1 rejected=2972
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [Etimad]: no_business_match=2081, already_closed=2
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [KSATendersGate]: no_business_match=298, future_publish_date=1
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [METenders]: no_business_match=8
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [TenderSA]: no_business_match=30
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [TendersInfo]: no_business_match=452
+2026-10-29 12:48:53,766 [INFO] main: Reject summary [TendersOnTime]: no_business_match=100
+2026-10-29 12:48:56,406 [INFO] utils.feed: Tender feed written: /home/runner/work/tenders-monitor/tenders-monitor/probe/out/tenders.json (1 tenders, failing sources: none)
+2026-10-29 12:48:56,408 [INFO] main: Daily CSV snapshot written: tenders_2026-10-29.csv (1 rows); master append skipped
+2026-10-29 12:48:56,408 [INFO] main: Telegram alert disabled
+2026-10-29 12:48:56,409 [INFO] main: Run summary written: run_summary.json
+2026-10-29 12:48:56,409 [INFO] main: ============================================================
+2026-10-29 12:48:56,409 [INFO] main: Run complete. CSV: tenders_2026-10-29.csv | Summary: run_summary.json | Matches: 1
+2026-10-29 12:48:56,409 [INFO] main: ============================================================

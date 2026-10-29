@@ -1,0 +1,66 @@
+{
+ "version": 1,
+ "generated_at": "2026-10-29T12:48:56.405905+00:00",
+ "status": "ok",
+ "sources": [
+  {
+   "site": "Etimad",
+   "status": "ok",
+   "raw_count": 2084,
+   "matched_count": 1,
+   "error": ""
+  },
+  {
+   "site": "KSATendersGate",
+   "status": "ok",
+   "raw_count": 299,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "METenders",
+   "status": "ok",
+   "raw_count": 8,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TenderSA",
+   "status": "ok",
+   "raw_count": 30,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TendersInfo",
+   "status": "ok",
+   "raw_count": 452,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TendersOnTime",
+   "status": "ok",
+   "raw_count": 100,
+   "matched_count": 0,
+   "error": ""
+  }
+ ],
+ "tenders": [
+  {
+   "key": "Etimad:261039004342",
+   "site": "Etimad",
+   "ref": "261039004342",
+   "title": "أعمال تأسيس منافذ لشواحن السيارات الكهربائية تعمل بنظام الطاقة الشمسية",
+   "link": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=SM0YehTOkEgmIRCEL53G0g==",
+   "published": "2026-10-29T10:36:55+03:00",
+   "closes": "2026-11-15T10:00:00+03:00",
+   "company": "Climatech",
+   "keywords": "شواحن سيارات, شواحن",
+   "agency": "القوات الخاصة للأمن والحماية",
+   "activity": "مقاولات عامة للمباني (الانشاء، الإصلاح، الهدم، الترميم)",
+   "description": "القوات الخاصة للأمن والحماية | المقر الرئيسي | مقاولات عامة للمباني (الانشاء، الإصلاح، الهدم، الترميم) | منافسة عامة",
+   "first_seen": "2026-10-29T15:48:56.405905+03:00"
+  }
+ ]
+}

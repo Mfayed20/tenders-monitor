@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-29",
+  "generated_at": "2026-10-29T12:48:56.409039+00:00",
+  "status": "ok",
+  "settings": {
+    "output_dir": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out",
+    "seen_db_path": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/seen.db",
+    "log_level": "INFO",
+    "run_window_hours": 720,
+    "close_window_days": 365,
+    "disabled_scrapers": [],
+    "telegram_enabled": false,
+    "dry_run": true
+  },
+  "totals": {
+    "raw": 2973,
+    "matched": 1,
+    "rejected": 2972,
+    "dedup_marked": 0
+  },
+  "scrapers": [
+    {
+      "site": "Etimad",
+      "status": "ok",
+      "needs_browser": true,
+      "disabled": false,
+      "raw_count": 2084,
+      "matched_count": 1,
+      "rejected_count": 2083,
+      "elapsed_seconds": 502.018,
+      "error": "",
+      "fatal": false
+    },
+    {
+      "site": "KSATendersGate",
+      "status": "ok",
+      "needs_browser": false,
+      "disabled": false,
+      "raw_count": 299,
+      "matched_count": 0,
+      "rejected_count": 299,
+      "elapsed_seconds": 4.254,
+      "error": "",
+      "fatal": false
+    },
+    {
+      "site": "METenders",
+      "status": "ok",
+      "needs_browser": true,
+      "disabled": false,
+      "raw_count": 8,
+      "matched_count": 0,
+      "rejected_count": 8,
+      "elapsed_seconds": 15.678,
+      "error": "",
+      "fatal": false
+    },
+    {
+      "site": "TenderSA",
+      "status": "ok",
+      "needs_browser": true,
+      "disabled": false,
+      "raw_count": 30,
+      "matched_count": 0,
+      "rejected_count": 30,
+      "elapsed_seconds": 6.375,
+      "error": "",
+      "fatal": false
+    },
+    {
+      "site": "TendersInfo",
+      "status": "ok",
+      "needs_browser": false,
+      "disabled": false,
+      "raw_count": 452,
+      "matched_count": 0,
+      "rejected_count": 452,
+      "elapsed_seconds": 2.774,
+      "error": "",
+      "fatal": false
+    },
+    {
+      "site": "TendersOnTime",
+      "status": "ok",
+      "needs_browser": false,
+      "disabled": false,
+      "raw_count": 100,
+      "matched_count": 0,
+      "rejected_count": 100,
+      "elapsed_seconds": 2.808,
+      "error": "",
+      "fatal": false
+    }
+  ],
+  "filter_reject_counts": {
+    "Etimad": {
+      "no_business_match": 2081,
+      "already_closed": 2
+    },
+    "KSATendersGate": {
+      "no_business_match": 298,
+      "future_publish_date": 1
+    },
+    "METenders": {
+      "no_business_match": 8
+    },
+    "TenderSA": {
+      "no_business_match": 30
+    },
+    "TendersInfo": {
+      "no_business_match": 452
+    },
+    "TendersOnTime": {
+      "no_business_match": 100
+    }
+  },
+  "matched_counts": {
+    "Etimad": 1
+  },
+  "outputs": {
+    "daily_csv": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/tenders_2026-10-29.csv",
+    "master_csv": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/all_tenders.csv",
+    "log_file": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/tender_monitor.log",
+    "seen_db": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/seen.db",
+    "run_summary": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/run_summary.json"
+  },
+  "telegram": {
+    "enabled": false,
+    "configured": false,
+    "sent": false
+  },
+  "errors": [],
+  "feed": {
+    "path": "/home/runner/work/tenders-monitor/tenders-monitor/probe/out/tenders.json",
+    "written": true
+  }
+}
