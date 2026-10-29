@@ -23,6 +23,8 @@ CLIMATECH = [
     "EV charging station including 1500 kVA transformer and substation works",
     "أعمال تأسيس منافذ لشواحن السيارات الكهربائية تعمل بنظام الطاقة الشمسية",  # live Etimad title
     "توريد شواحن للشاحنات الكهربائية",
+    "تهيئة البنية التحتية للشواحن الكهربائية بقيادة القوات بالرياض المرحلة الأولى",  # live Etimad title
+    "توريد عربات كهربائية لرئاسة أمن الدولة",  # live Etimad title: electric carts need charging too
     "ﺗﻮرﻳﺪ ﺷﻮاﺣﻦ ﺳﻴﺎرات ﻛﻬﺮﺑﺎﺋﻴﺔ",  # typed in Arabic presentation forms, as some Etimad titles are
 ]
 
@@ -41,6 +43,8 @@ NOT_CLIMATECH = [
     "صيانة شاحنة نقل وسيارات البلدية",
     "Supply of laptop charger with smart charging",
     "Supply of mobile charger with fast charging",
+    "MOBILE PHONE CHARGING",
+    "نقل وشحن مركبات",  # vehicle transport
 ]
 
 
