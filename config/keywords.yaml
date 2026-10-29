@@ -133,7 +133,7 @@ climatech:
 
   compound_en:
     - keyword: charger             # plural too; a charger on its own may be for phones or radios
-      context: [vehicle, car, ev, parking, electric vehicle, سيار, مركب, موقف, مواقف]
+      context: [vehicle, car, ev, parking, electric vehicle, electric bus, electric truck, سيار, مركب, موقف, مواقف]
     # Existing
     - keyword: commissioning
       context: [charger, ev, charging, شحن, شاحن]
@@ -173,9 +173,9 @@ climatech:
 
   compound_ar:
     - keyword: شاحن                  # charger: only with a car, vehicle or parking nearby
-      context: [سيار, مركب, موقف, مواقف, ev, vehicle, car, parking]
+      context: [سيار, مركب, موقف, مواقف, حافلات كهربائية, شاحنات كهربائية, ev, vehicle, car, parking]
     - keyword: شواحن                 # chargers
-      context: [سيار, مركب, موقف, مواقف, ev, vehicle, car, parking]
+      context: [سيار, مركب, موقف, مواقف, حافلات كهربائية, شاحنات كهربائية, ev, vehicle, car, parking]
     - keyword: أعمال كهربائية        # electrical works
       context: [شحن, شاحن, ev, charger]
     - keyword: تجهيز الموقع          # site preparation

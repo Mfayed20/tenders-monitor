@@ -21,6 +21,8 @@ CLIMATECH = [
     "Procurement of electric vehicles for the municipality",
     "Supply of chargers for electric vehicles",
     "EV charging station including 1500 kVA transformer and substation works",
+    "أعمال تأسيس منافذ لشواحن السيارات الكهربائية تعمل بنظام الطاقة الشمسية",  # live Etimad title
+    "توريد شواحن للشاحنات الكهربائية",
     "ﺗﻮرﻳﺪ ﺷﻮاﺣﻦ ﺳﻴﺎرات ﻛﻬﺮﺑﺎﺋﻴﺔ",  # typed in Arabic presentation forms, as some Etimad titles are
 ]
 
@@ -35,6 +37,8 @@ NOT_CLIMATECH = [
     "Electric Motor Repair",
     "تركيب مولدات كهربائية",
     "Freight charges and shipping services",
+    "أعمال خرط ولحام قطع ومكائن معدات الشاحنات والسيارات لبلدية محافظة البدائع",  # live Etimad title: trucks, not chargers
+    "صيانة شاحنة نقل وسيارات البلدية",
 ]
 
 

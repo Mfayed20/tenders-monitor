@@ -368,9 +368,14 @@ def _check_simple(combined: str, keywords: list[str]) -> list[str]:
 _AR_PREFIX = r"(?<![\u0621-\u064A])(?:[وفبلك]?(?:ال|لل)|[وفبلك])?"
 
 
+# Endings that turn a keyword into another word: شاحنات / شاحنه are trucks, not chargers.
+_AR_NOT_ENDING = {"شاحن": "ات|ه"}
+
+
 def _ar_word(word: str) -> str:
     stem = word[2:] if word.startswith("ال") and len(word) > 3 else word
-    return _AR_PREFIX + re.escape(stem)
+    not_ending = _AR_NOT_ENDING.get(stem)
+    return _AR_PREFIX + re.escape(stem) + (f"(?!{not_ending})" if not_ending else "")
 
 
 @lru_cache(maxsize=None)
