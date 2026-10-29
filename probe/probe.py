@@ -28,7 +28,7 @@ def spy(tenders, *a, **k):
         seen[key] = {"site": t.site, "ref": t.ref_number, "title": t.title, "description": t.description[:400],
                      "published": t.publish_date.isoformat() if t.publish_date else t.publish_date_raw,
                      "closes": t.close_date.isoformat() if t.close_date else t.close_date_raw,
-                     "activity": (t.raw_data or {}).get("tenderActivityName", ""),
+                     "activity": (t.raw_data or {}).get("activity", ""),
                      "matched": m.matched, "company": m.company, "keywords": m.matched_keywords}
     return real_filter(tenders, *a, **k)
 
