@@ -80,6 +80,14 @@ def parse_date(date_str: str) -> datetime | None:
     # Collapse separators
     cleaned = re.sub(r"\s+", " ", cleaned)
 
+    # ISO dates (year first) are never day-first: dayfirst=True would read 2026-10-11T10:46 as 10 November
+    if re.match(r"^\d{4}-\d{2}-\d{2}[T ]\d", cleaned):
+        try:
+            dt = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=KSA_TZ)
+        except ValueError:
+            pass
+
     if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2})?$", cleaned):
         for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M"):
             try:
