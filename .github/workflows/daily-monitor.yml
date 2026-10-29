@@ -15,7 +15,8 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write # publishes feed/tenders.json on the tender-feed branch for the CRM
+  actions: write # keeps this schedule switched on (see the last step)
 
 concurrency:
   group: daily-tender-monitor
@@ -32,6 +33,7 @@ jobs:
       TENDER_OUTPUT_DIR: output
       TENDER_SEEN_DB_PATH: output/seen_tenders.db
       TENDER_LOG_LEVEL: INFO
+      TENDER_FEED_PATH: feed/tenders.json
 
     steps:
       - name: Check out repository
@@ -57,9 +59,32 @@ jobs:
           restore-keys: |
             seen-tenders-
 
+      - name: Restore the CRM feed
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.telegram_test }}
+        run: |
+          mkdir -p feed
+          if git fetch --depth=1 origin tender-feed; then
+            git show FETCH_HEAD:tenders.json > feed/tenders.json || rm -f feed/tenders.json
+          fi
+
       - name: Run monitor
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.telegram_test }}
         run: python main.py
+
+      - name: Publish the CRM feed
+        # the CRM (crm.climch.com) reads tenders.json from the tender-feed branch
+        if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || !inputs.telegram_test) && hashFiles('feed/tenders.json') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir="$RUNNER_TEMP/tender-feed"
+          rm -rf "$dir" && mkdir -p "$dir" && cp feed/tenders.json "$dir/"
+          cd "$dir"
+          git init -q -b tender-feed
+          git add tenders.json
+          git -c user.name="tender-monitor" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Tender feed $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:tender-feed
 
       - name: Send Telegram smoke test
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.telegram_test }}
@@ -93,5 +118,15 @@ jobs:
             output/all_tenders.csv
             output/seen_tenders.db
             output/run_summary.json
+            feed/tenders.json
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Keep the schedule switched on
+        # GitHub switches off scheduled workflows after 60 days without activity in the repository
+        # (that is what stopped this monitor on 2026-09-05); re-enabling it every run resets that.
+        if: ${{ github.event_name == 'schedule' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/daily-monitor.yml/enable"

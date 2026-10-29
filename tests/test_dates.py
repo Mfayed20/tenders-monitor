@@ -37,3 +37,11 @@ def test_old_publish_date_is_rejected():
 def test_missing_dates_remain_conservative():
     assert is_new_tender(None) is True
     assert is_closing_soon(None) is True
+
+
+def test_parse_iso_datetime_is_never_read_day_first():
+    # KSATendersGate's API gives "2026-10-11T10:46:23"; read day-first it became 10 November
+    # and the tender was dropped as "published in the future".
+    parsed = parse_date("2026-10-11T10:46:23")
+    assert (parsed.year, parsed.month, parsed.day, parsed.hour) == (2026, 10, 11, 10)
+    assert parse_date("2026-10-11T10:46:23Z").utcoffset().total_seconds() == 0

@@ -67,7 +67,7 @@ python main.py --purge
 python main.py --dry-run --no-telegram
 
 # Override runtime paths/windows
-python main.py --output-dir output --seen-db output/seen_tenders.db --run-window-hours 168 --close-window-days 30
+python main.py --output-dir output --seen-db output/seen_tenders.db --run-window-hours 720 --close-window-days 365
 ```
 
 ### Runtime Configuration

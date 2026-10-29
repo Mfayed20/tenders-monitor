@@ -13,11 +13,12 @@ Tenders are in .details-wrapper containers with structured fields:
 
 import logging
 import re
+from datetime import datetime
 
 from bs4 import BeautifulSoup
 
 from scrapers.base import BaseScraper, Tender
-from utils.dates import parse_date
+from utils.dates import KSA_TZ, parse_date
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,9 @@ logger = logging.getLogger(__name__)
 class TendersaScraper(BaseScraper):
     SITE_NAME = "TenderSA"
     BASE_URL = "https://www.tendersa.com"
-    SEARCH_URL = "https://www.tendersa.com/TendersSearch.aspx"
+    SEARCH_URL = "https://www.tendersa.com/TendersSearch.aspx?country=sa&lang=en"
     NEEDS_BROWSER = True
-    WAIT_SELECTOR = "article.tg2-card, .details-wrapper, a[href*='TenderDetails']"
+    WAIT_SELECTOR = "article.tg-card, article.tg2-card, .details-wrapper, a[href*='TenderDetails']"
 
     async def scrape(self, browser=None) -> list[Tender]:
         if browser is None:
@@ -67,7 +68,7 @@ class TendersaScraper(BaseScraper):
         soup = BeautifulSoup(html, "lxml")
         tenders = []
 
-        wrappers = soup.select(".details-wrapper, article.tg2-card")
+        wrappers = soup.select(".details-wrapper, article.tg-card, article.tg2-card")
         for wrapper in wrappers:
             tender = self._parse_wrapper(wrapper)
             if tender:
@@ -79,6 +80,7 @@ class TendersaScraper(BaseScraper):
         """Parse a single .details-wrapper into a Tender."""
         # Title and link
         title_el = wrapper.select_one(
+            ".tg-title a[href*='TenderDetails'], "
             ".tg2-title a[href*='TenderDetails'], "
             ".FirstRowTndrNam h4 a[href*='TenderDetails'], "
             ".FirstRowTndrNam a[href*='TenderDetails'], "
@@ -103,7 +105,7 @@ class TendersaScraper(BaseScraper):
         takeoff = wrapper.select_one(".take-off")
         if publish_el:
             publish_date_raw = publish_el.get_text(" ", strip=True)
-            publish_date = parse_date(publish_date_raw)
+            publish_date = parse_date(publish_date_raw) or self._data_date(publish_el)
         if not publish_date_raw and takeoff:
             text = takeoff.get_text()
             date_match = self._find_date(text)
@@ -121,7 +123,7 @@ class TendersaScraper(BaseScraper):
         landing = wrapper.select_one(".landing")
         if deadline_el:
             close_date_raw = deadline_el.get_text(" ", strip=True)
-            close_date = parse_date(close_date_raw)
+            close_date = parse_date(close_date_raw) or self._data_date(deadline_el)
         if not close_date_raw and landing:
             text = landing.get_text()
             date_match = self._find_date(text)
@@ -133,8 +135,8 @@ class TendersaScraper(BaseScraper):
             close_date = parse_date(close_date_raw)
 
         # Ref ID
-        ref_el = wrapper.select_one(".tg2-tid-number, span[id*='lblTenderJoID']")
-        ref_number = ref_el.get_text(strip=True) if ref_el else ""
+        ref_el = wrapper.select_one(".tg-id, .tg2-tid-number, span[id*='lblTenderJoID']")
+        ref_number = str(wrapper.get("data-tender-id") or "").strip() or (ref_el.get_text(strip=True) if ref_el else "")
         if not ref_number:
             ref_match = re.search(r"\bTGID\s+(\d+)\b", wrapper_text, flags=re.I)
             if ref_match:
@@ -155,6 +157,15 @@ class TendersaScraper(BaseScraper):
             link=link,
             description=wrapper_text[:500],
         )
+
+    @staticmethod
+    def _data_date(el):
+        """The card also carries the date as data-date="29/10/2026" (day first)."""
+        value = str(el.get("data-date") or "").strip()
+        try:
+            return datetime.strptime(value, "%d/%m/%Y").replace(tzinfo=KSA_TZ)
+        except ValueError:
+            return None
 
     @staticmethod
     def _find_date(text: str) -> str:
