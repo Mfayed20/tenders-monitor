@@ -455,6 +455,9 @@ general_ev:
   - سيارة كهربائية
   - مركبات كهربائية
   - مركبة كهربائية
+  - عربات كهربائية      # electric carts (live Etimad title, Aug 2026)
+  - عربة كهربائية
+  - electric cart
 
 sources:
   tendersinfo_queries:
