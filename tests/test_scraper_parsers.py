@@ -515,6 +515,38 @@ def test_etimad_json_list_reads_pages_until_lookback():
     assert tenders[0].close_date is None
 
 
+def test_etimad_json_list_keeps_read_pages_when_a_later_page_is_a_bot_check():
+    from datetime import datetime, timedelta
+
+    stamp = (datetime.now(KSA_TZ) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    first = {"data": [{"tenderId": 1, "tenderIdString": "id1==", "referenceNumber": "1", "tenderName": "Tender 1",
+                       "submitionDate": stamp, "lastOfferPresentationDate": "0001-01-01T00:00:00"}]}
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, body):
+            self.body = body
+
+        async def text(self):
+            return self.body
+
+    class FakeRequest:
+        async def get(self, url, timeout, headers):
+            page = int(url.rsplit("PageNumber=", 1)[1])
+            return FakeResponse(json.dumps(first) if page == 1 else "<html>Please enable JavaScript</html>")
+
+    class FakeContext:
+        request = FakeRequest()
+
+    scraper = EtimadScraper()
+    scraper.API_PAUSE_SECONDS = 0
+    tenders = asyncio.run(scraper._scrape_api(FakeContext()))
+
+    assert [t.ref_number for t in tenders] == ["1"]
+    assert scraper.run_errors
+
+
 def test_tendersa_parser_reads_the_october_2026_cards():
     tenders = TendersaScraper()._parse_page(_read_text("tendersa_tg.html"))
 

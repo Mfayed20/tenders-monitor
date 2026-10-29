@@ -365,6 +365,13 @@ def _check_simple(combined: str, keywords: list[str]) -> list[str]:
     return hits
 
 
+# Words that tie a charging phrase to vehicles or charging sites (see Layer 3 in match_tender).
+EV_CONTEXT = [
+    "ev", "evs", "evse", "electric vehicle", "electric car", "electric bus", "electric truck", "vehicle", "car",
+    "charging station", "charging hub", "charge point", "chargepoint", "wallbox", "parking",
+    "سيار", "مركب", "حافلات", "شاحنات كهربائيه", "محطه شحن", "محطات شحن", "نقاط شحن", "مواقف",
+]
+
 _AR_PREFIX = r"(?<![\u0621-\u064A])(?:[وفبلك]?(?:ال|لل)|[وفبلك])?"
 
 
@@ -489,8 +496,11 @@ def match_tender(title: str, description: str = "") -> MatchResult:
 
     # --- Layer 3: Negative keyword rejection ---
     # A clear charging/EV phrase wins over a negative word: big charging hubs come with a
-    # transformer or substation, and those tenders must not be dropped.
-    clear = _check_simple(combined, CLIMATECH_KEYWORDS_EN + CLIMATECH_KEYWORDS_AR + EVS_KEYWORDS_EN + EVS_KEYWORDS_AR)
+    # transformer or substation, and those tenders must not be dropped. It has to name a
+    # vehicle or a charging site, so "laptop charger with smart charging" stays out.
+    clear = _check_simple(combined, CLIMATECH_KEYWORDS_EN + CLIMATECH_KEYWORDS_AR + EVS_KEYWORDS_EN + EVS_KEYWORDS_AR) and _contains_any(
+        combined, EV_CONTEXT
+    )
     if not clear and _contains_any(combined, NEGATIVE_KEYWORDS):
         return MatchResult(
             matched=False,

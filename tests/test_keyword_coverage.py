@@ -39,6 +39,8 @@ NOT_CLIMATECH = [
     "Freight charges and shipping services",
     "أعمال خرط ولحام قطع ومكائن معدات الشاحنات والسيارات لبلدية محافظة البدائع",  # live Etimad title: trucks, not chargers
     "صيانة شاحنة نقل وسيارات البلدية",
+    "Supply of laptop charger with smart charging",
+    "Supply of mobile charger with fast charging",
 ]
 
 

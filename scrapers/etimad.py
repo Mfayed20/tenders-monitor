@@ -100,13 +100,14 @@ class EtimadScraper(BaseScraper):
                     response = await context.request.get(url, timeout=60000, headers={"Accept": "application/json"})
                 if response.status != 200:
                     raise RuntimeError(f"HTTP {response.status} for page {page_num}")
+                # a bot-check page or a changed format fails here too, and keeps what was read
+                records = self._api_records(await response.text())
             except Exception as exc:
                 if not tenders:
                     raise
                 # keep what was read; the next run reads the same hours again
                 self.record_run_error(f"Etimad JSON list stopped at page {page_num} ({len(tenders)} tenders read)", exc)
                 break
-            records = self._api_records(await response.text())
             if not records:
                 break
             oldest = None
