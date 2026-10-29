@@ -38,6 +38,11 @@ negative:
   - mobile application development
   - battery energy storage
   - energy storage system
+  - mobile charger
+  - شاحن جوال
+  - شواحن جوال
+  - شاحن لاسلكي
+  - شواحن لاسلكي
 
 # ---------------------------------------------------------------------------
 # Climatech Charger — chargers, installation, infrastructure, CPO
@@ -55,7 +60,19 @@ climatech:
     - ac dc charging station
     - dc fast charger
     - ac charger
+    - dc charger
     - level 2 charger
+    - electric vehicle charger
+    - ev charge
+    - charge point
+    - chargepoint
+    - charging hub
+    - charging pile
+    - charging bay
+    - fast charging
+    - e charging
+    - evse
+    - wallbox
     - charging point
     - charging equipment
     - charging network
@@ -101,8 +118,22 @@ climatech:
     - تشغيل نقاط الشحن             # charge point operation
     - صيانة الشواحن                # charger maintenance
     - تجهيز موقع الشحن             # charging site preparation
+    - محطات شحن                    # charging stations
+    - نقاط شحن                     # charging points
+    - شواحن كهربائية               # electric chargers
+    - شاحن سيارة                   # car charger
+    - شاحن سيارات                  # car chargers
+    - شواحن سيارات                 # car chargers
+    - شاحن مركبات                  # vehicle charger
+    - شواحن مركبات                 # vehicle chargers
+    - شاحن المركبات                # the vehicle charger
+    - شواحن المركبات               # the vehicle chargers
+    - شحن المركبات الكهربائية      # EV charging
+    - شحن كهربائي                  # electric charging
 
   compound_en:
+    - keyword: charger             # plural too; a charger on its own may be for phones or radios
+      context: [vehicle, car, ev, parking, electric vehicle, سيار, مركب, موقف, مواقف]
     # Existing
     - keyword: commissioning
       context: [charger, ev, charging, شحن, شاحن]
@@ -141,6 +172,10 @@ climatech:
       context: [charger, ev, charging, شحن, شاحن]
 
   compound_ar:
+    - keyword: شاحن                  # charger: only with a car, vehicle or parking nearby
+      context: [سيار, مركب, موقف, مواقف, ev, vehicle, car, parking]
+    - keyword: شواحن                 # chargers
+      context: [سيار, مركب, موقف, مواقف, ev, vehicle, car, parking]
     - keyword: أعمال كهربائية        # electrical works
       context: [شحن, شاحن, ev, charger]
     - keyword: تجهيز الموقع          # site preparation
@@ -407,6 +442,19 @@ evs:
       context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
     - keyword: باقات صيانة
       context: [خدمة, صيانة, إصلاح, تشخيص, بطارية, وحدة, ورشة, مركبة, سيارة, أسطول, كهربائي, كهربائية]
+
+# ---------------------------------------------------------------------------
+# General EV mentions with no specific scope (e.g. buying electric cars):
+# used only when nothing above matched; reported under Climatech.
+# ---------------------------------------------------------------------------
+general_ev:
+  - electric vehicle
+  - electric car
+  - electric mobility
+  - سيارات كهربائية
+  - سيارة كهربائية
+  - مركبات كهربائية
+  - مركبة كهربائية
 
 sources:
   tendersinfo_queries:

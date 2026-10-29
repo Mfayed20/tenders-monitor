@@ -13,7 +13,9 @@ the hardcoded defaults below.
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -207,6 +209,11 @@ _DEFAULT_EVS_SUPPLY_NEGATIVE = [
     "لوحات كهربائية",
 ]
 
+_DEFAULT_GENERAL_EV = [
+    "electric vehicle", "electric car", "electric mobility",
+    "سيارات كهربائية", "سيارة كهربائية", "مركبات كهربائية", "مركبة كهربائية",
+]
+
 _DEFAULT_TENDERSINFO_QUERIES = [
     "ev charging station",
     "charge point operator",
@@ -290,6 +297,7 @@ if _yaml_data:
     EVS_SERVICE_ANCHORS_EN = _strip_comments(_evs_data.get("service_anchors_en", [])) or _DEFAULT_EVS_SERVICE_ANCHORS_EN
     EVS_SERVICE_ANCHORS_AR = _strip_comments(_evs_data.get("service_anchors_ar", [])) or _DEFAULT_EVS_SERVICE_ANCHORS_AR
     EVS_SUPPLY_NEGATIVE   = _strip_comments(_evs_data.get("supply_negative", [])) or _DEFAULT_EVS_SUPPLY_NEGATIVE
+    GENERAL_EV_KEYWORDS   = _strip_comments(_yaml_data.get("general_ev", [])) or _DEFAULT_GENERAL_EV
     _sources_data         = _yaml_data.get("sources", {})
     TENDERSINFO_QUERIES   = _strip_comments(_sources_data.get("tendersinfo_queries", [])) or _DEFAULT_TENDERSINFO_QUERIES
 else:
@@ -310,6 +318,7 @@ else:
     EVS_SERVICE_ANCHORS_AR = _DEFAULT_EVS_SERVICE_ANCHORS_AR
     EVS_SUPPLY_NEGATIVE    = _DEFAULT_EVS_SUPPLY_NEGATIVE
     TENDERSINFO_QUERIES    = _DEFAULT_TENDERSINFO_QUERIES
+    GENERAL_EV_KEYWORDS    = _DEFAULT_GENERAL_EV
 
 
 # ---------------------------------------------------------------------------
@@ -324,9 +333,27 @@ class MatchResult:
     reject_reason: str = ""
 
 
+_AR_DIACRITICS = re.compile(r"[\u064B-\u0652\u0670\u0640]")  # harakat, dagger alef, tatweel
+_AR_FOLD = str.maketrans({
+    "أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا",
+    "ة": "ه", "ى": "ي",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+})
+
+
 def _normalize(text: str) -> str:
-    """Lowercase and collapse whitespace for matching."""
-    return re.sub(r"\s+", " ", text.lower().strip())
+    """Fold text for matching: lowercase, one spelling per Arabic letter, no diacritics.
+
+    Etimad titles mix spellings (سيارة / سياره, إصلاح / اصلاح), so keywords and
+    text are folded the same way. Hyphens and slashes count as spaces
+    ("EV-charging" = "ev charging").
+    """
+    # NFKC turns Arabic presentation forms (some Etimad titles are typed in them) into plain letters
+    text = unicodedata.normalize("NFKC", text or "")
+    text = _AR_DIACRITICS.sub("", text.lower()).translate(_AR_FOLD)
+    text = re.sub(r"[-_/\\]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _check_simple(combined: str, keywords: list[str]) -> list[str]:
@@ -338,16 +365,32 @@ def _check_simple(combined: str, keywords: list[str]) -> list[str]:
     return hits
 
 
-def _has_word(word: str, text: str) -> bool:
-    """Check if word appears as a whole word (not substring) in text.
+_AR_PREFIX = r"(?<![\u0621-\u064A])(?:[وفبلك]?(?:ال|لل)|[وفبلك])?"
 
-    Uses word-boundary regex for Latin words (e.g. 'ev' won't match 'development').
-    Arabic words use substring matching since Arabic has no spaces between some forms.
+
+def _ar_word(word: str) -> str:
+    stem = word[2:] if word.startswith("ال") and len(word) > 3 else word
+    return _AR_PREFIX + re.escape(stem)
+
+
+@lru_cache(maxsize=None)
+def _pattern(word: str) -> re.Pattern:
+    folded = _normalize(word)
+    if any("\u0600" <= ch <= "\u06FF" for ch in folded):
+        # Each Arabic word may carry the article or a joined letter (السيارات, وشواحن, للشحن)
+        # and any ending (كهربائي / كهربائيه / كهربائيين).
+        return re.compile(r"\s+".join(_ar_word(w) if re.match(r"[\u0600-\u06FF]", w) else re.escape(w) for w in folded.split()))
+    # whole words; the last word may take a plural ending ("charging stations", "ev chargers")
+    return re.compile(r"\b" + re.escape(folded) + r"(?:s|es)?\b")
+
+
+def _has_word(word: str, text: str) -> bool:
+    """Check if word appears as a whole word (not substring) in folded text.
+
+    Latin words use word boundaries (e.g. 'ev' won't match 'development').
+    Arabic words must start a word but may carry a prefix (ال, و, ب, ل, لل).
     """
-    # Arabic characters don't need word boundary — substring is fine
-    if any("\u0600" <= ch <= "\u06FF" for ch in word):
-        return word in text
-    return bool(re.search(r"\b" + re.escape(word.lower()) + r"\b", text))
+    return bool(_pattern(word).search(text))
 
 
 def _check_compound(combined: str, compounds: list[tuple]) -> list[str]:
@@ -422,6 +465,11 @@ def match_tender(title: str, description: str = "") -> MatchResult:
         evs_hits = []
         evs_reject_reason = "evs_supply_negative"
 
+    # Generic EV mentions ("supply of electric vehicles", "توريد سيارات كهربائية") with no
+    # specific scope: an EV purchase usually needs chargers too, so they go to Climatech.
+    if not (climatech_hits or evs_hits):
+        climatech_hits = _check_simple(combined, GENERAL_EV_KEYWORDS)
+
     climatech = bool(climatech_hits)
     evs = bool(evs_hits)
     matched_keywords = climatech_hits + evs_hits
@@ -435,7 +483,10 @@ def match_tender(title: str, description: str = "") -> MatchResult:
         )
 
     # --- Layer 3: Negative keyword rejection ---
-    if _contains_any(combined, NEGATIVE_KEYWORDS):
+    # A clear charging/EV phrase wins over a negative word: big charging hubs come with a
+    # transformer or substation, and those tenders must not be dropped.
+    clear = _check_simple(combined, CLIMATECH_KEYWORDS_EN + CLIMATECH_KEYWORDS_AR + EVS_KEYWORDS_EN + EVS_KEYWORDS_AR)
+    if not clear and _contains_any(combined, NEGATIVE_KEYWORDS):
         return MatchResult(
             matched=False,
             company="",

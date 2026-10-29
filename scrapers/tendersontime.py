@@ -40,7 +40,7 @@ class TendersOnTimeScraper(BaseScraper):
     API_URL = "https://www.tendersontime.com/ApiTenders/getTenderDetails"
     NEEDS_BROWSER = False
 
-    MAX_PAGES = 3  # 3 pages of results
+    MAX_PAGES = 10  # 10 records a page
     RETRY_WAIT = wait_exponential(multiplier=2, min=2, max=10)
 
     async def _fetch_page(self, client: httpx.AsyncClient, page_num: int) -> dict | list:

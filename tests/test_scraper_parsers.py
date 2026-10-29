@@ -454,3 +454,61 @@ def test_tendersontime_fetch_retries_transient_timeout():
 
     assert client.calls == 2
     assert data["tenderDetails"][0]["ID"] == "TOT-RETRY"
+
+
+def test_etimad_json_record_parses_agency_dates_and_link():
+    data = _read_json("etimad_api.json")
+    scraper = EtimadScraper()
+    tender = scraper._parse_api_record(data["data"][1])
+
+    assert tender.title == "توريد وتركيب شواحن للسيارات الكهربائية بمقر الهيئة"
+    assert tender.ref_number == data["data"][1]["referenceNumber"]
+    assert tender.publish_date.tzinfo == KSA_TZ
+    assert tender.close_date is not None and tender.close_date > tender.publish_date
+    assert tender.link.startswith("https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=")
+    assert data["data"][1]["agencyName"] in tender.description
+    assert tender.raw_data["agency"] == data["data"][1]["agencyName"]
+
+
+def test_etimad_json_list_reads_pages_until_lookback():
+    from datetime import datetime, timedelta
+
+    now = datetime.now(KSA_TZ)
+
+    def record(n, hours_ago):
+        stamp = (now - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%S.1234567")
+        return {"tenderId": n, "tenderIdString": f"id{n}==", "referenceNumber": str(n), "tenderName": f"Tender {n}",
+                "submitionDate": stamp, "lastOfferPresentationDate": "0001-01-01T00:00:00"}
+
+    pages = {
+        1: [record(1, 1), record(2, 30)],
+        2: [record(3, 60), record(4, 100)],
+        3: [record(5, 200)],
+    }
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.status = 200
+            self.body = body
+
+        async def text(self):
+            return json.dumps(self.body)
+
+    class FakeRequest:
+        def __init__(self):
+            self.urls = []
+
+        async def get(self, url, timeout, headers):
+            self.urls.append(url)
+            page = int(url.rsplit("PageNumber=", 1)[1])
+            return FakeResponse({"data": pages.get(page, [])})
+
+    class FakeContext:
+        request = FakeRequest()
+
+    scraper = EtimadScraper()
+    tenders = asyncio.run(scraper._scrape_api(FakeContext()))
+
+    assert [t.ref_number for t in tenders] == ["1", "2", "3", "4"]
+    assert len(FakeContext.request.urls) == 2  # page 2 already reaches back past 96 hours
+    assert tenders[0].close_date is None

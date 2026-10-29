@@ -25,7 +25,7 @@ import sys
 import time
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,11 @@ from utils.telegram_notifier import (
     send_telegram_test_message,
     telegram_credentials_configured,
 )
+
+# Tenders published in the last 30 days and closing within a year. The dedup database stops
+# repeats, so a wide window only means a missed run or a slow source is caught up later.
+DEFAULT_RUN_WINDOW_HOURS = 720
+DEFAULT_CLOSE_WINDOW_DAYS = 365
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "output"
@@ -106,8 +111,8 @@ class RuntimeSettings:
     output_dir: Path | str = DEFAULT_OUTPUT_DIR
     seen_db_path: Path | str | None = None
     log_level: str = "INFO"
-    run_window_hours: int = 168
-    close_window_days: int = 30
+    run_window_hours: int = DEFAULT_RUN_WINDOW_HOURS
+    close_window_days: int = DEFAULT_CLOSE_WINDOW_DAYS
     disabled_scrapers: set[str] = field(default_factory=set)
     telegram_enabled: bool = True
     dry_run: bool = False
@@ -256,12 +261,12 @@ def settings_from_args(args: argparse.Namespace) -> RuntimeSettings:
         run_window_hours=_parse_positive_int(
             "run_window_hours",
             args.run_window_hours if args.run_window_hours is not None else os.getenv("TENDER_RUN_WINDOW_HOURS"),
-            168,
+            DEFAULT_RUN_WINDOW_HOURS,
         ),
         close_window_days=_parse_positive_int(
             "close_window_days",
             args.close_window_days if args.close_window_days is not None else os.getenv("TENDER_CLOSE_WINDOW_DAYS"),
-            30,
+            DEFAULT_CLOSE_WINDOW_DAYS,
         ),
         disabled_scrapers=resolve_scraper_names(env_disabled + cli_disabled),
         telegram_enabled=telegram_enabled,
@@ -314,6 +319,9 @@ async def _run_single_scraper(scraper: Any, browser: Any = None) -> tuple[list[T
         tenders = await scraper.scrape(browser=browser)
         stats.raw_count = len(tenders)
         run_errors = list(getattr(scraper, "run_errors", []))
+        if not tenders and not run_errors:
+            # a site that changed its layout returns nothing without raising: that is a failure too
+            run_errors.append(f"{scraper.SITE_NAME} returned no tenders")
         if run_errors:
             stats.error = " | ".join(run_errors)
         return tenders, stats
@@ -414,18 +422,24 @@ def _log_filter_diagnostics(diagnostics: FilterDiagnostics) -> None:
             logger.info("Reject summary [%s]: %s", site, summary)
 
 
+def _end_of_close_day(close_date: datetime) -> datetime:
+    """A closing date with no time (midnight) is open until the end of that day."""
+    if (close_date.hour, close_date.minute, close_date.second) == (0, 0, 0):
+        return close_date + timedelta(days=1) - timedelta(seconds=1)
+    return close_date
+
+
 def filter_tenders(
     tenders: list[Tender],
-    run_window_hours: int = 168,
-    close_window_days: int = 30,
+    run_window_hours: int = DEFAULT_RUN_WINDOW_HOURS,
+    close_window_days: int = DEFAULT_CLOSE_WINDOW_DAYS,
     dry_run: bool = False,
 ) -> tuple[list[TenderRow], FilterDiagnostics]:
     """
     Filter tenders by:
     1. EV keyword match (English + Arabic)
-    2. Published within last 7 days — if publish date available
-       (EV tenders are rare; 24h is too aggressive)
-    3. Closing within 30 days — if close date available
+    2. Published within the run window (30 days by default) — if a publish date is known
+    3. Not closed yet, and closing within the close window (a year by default) — if known
     4. Not previously seen (dedup)
     """
     matched = []
@@ -439,24 +453,23 @@ def filter_tenders(
             diagnostics.record_reject(t.site, result.reject_reason or "no_business_match")
             continue
 
-        # Time filters (conservative only when the source exposes no date at all)
+        # Time filters. A date the parser could not read is treated as unknown, never as a
+        # reason to drop the tender (missing a real tender is worse than one extra alert).
         if t.publish_date is None and has_date_text(t.publish_date_raw):
-            diagnostics.record_reject(t.site, "unparsed_publish_date")
-            continue
+            logger.warning("Unreadable publish date kept as unknown: %s %r", t.site, t.publish_date_raw)
         if t.close_date is None and has_date_text(t.close_date_raw):
-            diagnostics.record_reject(t.site, "unparsed_close_date")
-            continue
+            logger.warning("Unreadable closing date kept as unknown: %s %r", t.site, t.close_date_raw)
 
-        if t.publish_date and t.publish_date > now:
+        if t.publish_date and t.publish_date > now + timedelta(days=1):
             diagnostics.record_reject(t.site, "future_publish_date")
             continue
-        if not is_new_tender(t.publish_date, hours=run_window_hours):
+        if not is_new_tender(min(t.publish_date, now) if t.publish_date else None, hours=run_window_hours):
             diagnostics.record_reject(t.site, "publish_window")
             continue
-        if t.close_date and t.close_date < now:
+        if t.close_date and _end_of_close_day(t.close_date) < now:
             diagnostics.record_reject(t.site, "already_closed")
             continue
-        if not is_closing_soon(t.close_date, days=close_window_days):
+        if not is_closing_soon(_end_of_close_day(t.close_date) if t.close_date else None, days=close_window_days):
             diagnostics.record_reject(t.site, "close_window")
             continue
 

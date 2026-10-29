@@ -2,17 +2,21 @@
 Scraper for tenders.etimad.sa — the official Saudi government procurement portal.
 Public visitor page: https://tenders.etimad.sa/Tender/AllTendersForVisitor
 
-The page uses ASP.NET with JS rendering. Tender listings appear as
-links to /Tender/DetailsForVisitor?STenderId=...
-Each tender has a title, ref number, dates, and status.
+The visitor page fills itself from a JSON list (AllSupplierTendersForVisitorAsync), newest
+first, with the agency, activity, publish time and last offer date of every tender. The site
+sits behind a bot check, so a real browser opens the visitor page first and the JSON pages
+are then read with that browser's cookies. Etimad publishes several hundred tenders a day,
+so the scraper reads back to LOOKBACK_HOURS (not a fixed number of pages); a run that is
+late or missed is caught up by the next one.
 
-Requires Playwright for JS rendering.
+If the JSON list fails, the old way (the rendered pages, 6 tenders each) is used.
 """
 
+import json
 import logging
 import re
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from bs4 import BeautifulSoup
@@ -29,7 +33,11 @@ class EtimadScraper(BaseScraper):
     BASE_URL = "https://tenders.etimad.sa/Tender/AllTendersForVisitor"
     NEEDS_BROWSER = True
 
-    MAX_PAGES = 15
+    API_URL = "https://tenders.etimad.sa/Tender/AllSupplierTendersForVisitorAsync"
+    API_PAGE_SIZE = 100
+    API_MAX_PAGES = 60
+    LOOKBACK_HOURS = 96
+    MAX_PAGES = 15  # rendered-page fallback
     GREGORIAN_DATE_RE = re.compile(
         r"(?P<date>\d{1,2}/\d{1,2}/20\d{2}|\d{4}-\d{1,2}-\d{1,2})"
         r"(?:\s+\d{1,2}/\d{1,2}/1\d{3})?"
@@ -40,9 +48,9 @@ class EtimadScraper(BaseScraper):
     async def scrape(self, browser=None) -> list[Tender]:
         if browser is None:
             self.logger.error("Etimad requires a Playwright browser instance")
+            self.record_run_error("Etimad requires a Playwright browser instance")
             return []
 
-        tenders = []
         context = await browser.new_context(
             locale="ar-SA",
             user_agent=(
@@ -54,33 +62,137 @@ class EtimadScraper(BaseScraper):
         page = await context.new_page()
 
         try:
-            for page_num in range(1, self.MAX_PAGES + 1):
-                url = f"{self.BASE_URL}?PageNumber={page_num}"
-                self.logger.info("Fetching Etimad page %d: %s", page_num, url)
-
-                try:
-                    html = await self._load_listing_page(page, url)
-                except Exception as exc:
-                    html = await page.content()
-                    if "DetailsForVisitor" not in html:
-                        self.logger.exception("Failed to load Etimad page %d", page_num)
-                        self.record_run_error(f"Failed to load Etimad page {page_num}", exc)
-                        break
-                    self.logger.warning("Etimad page %d load raised %s, but detail links were available", page_num, exc)
-
-                page_tenders = self._parse_page(html)
-                if not page_tenders:
-                    self.logger.info("No tenders found on page %d — stopping", page_num)
-                    break
-
-                page_tenders = await self._enrich_page_tenders(page, page_tenders)
-                tenders.extend(page_tenders)
-                self.logger.info("Found %d tenders on page %d", len(page_tenders), page_num)
-
+            try:
+                await self._load_listing_page(page, self.BASE_URL)
+                tenders = await self._scrape_api(context)
+                if tenders:
+                    self.logger.info("Etimad total: %d tenders read from the JSON list", len(tenders))
+                    return tenders
+                self.record_run_error("Etimad JSON list returned no tenders; used the rendered pages instead")
+            except Exception as exc:
+                self.logger.exception("Etimad JSON list failed; using the rendered pages")
+                self.record_run_error("Etimad JSON list failed; used the rendered pages instead", exc)
+            tenders = await self._scrape_pages(page)
         finally:
             await context.close()
 
         self.logger.info("Etimad total: %d tenders scraped", len(tenders))
+        return tenders
+
+    async def _scrape_api(self, context) -> list[Tender]:
+        """Read the JSON list, newest first, until tenders are older than LOOKBACK_HOURS."""
+        oldest_wanted = datetime.now(KSA_TZ) - timedelta(hours=self.LOOKBACK_HOURS)
+        tenders: list[Tender] = []
+        seen: set[str] = set()
+        for page_num in range(1, self.API_MAX_PAGES + 1):
+            url = f"{self.API_URL}?PageSize={self.API_PAGE_SIZE}&PageNumber={page_num}"
+            response = await context.request.get(url, timeout=60000, headers={"Accept": "application/json"})
+            if response.status != 200:
+                raise RuntimeError(f"HTTP {response.status} for page {page_num}")
+            records = self._api_records(await response.text())
+            if not records:
+                break
+            oldest = None
+            for record in records:
+                tender = self._parse_api_record(record)
+                if not tender:
+                    continue
+                if tender.publish_date and (oldest is None or tender.publish_date < oldest):
+                    oldest = tender.publish_date
+                key = tender.raw_data.get("etimad_tender_id") or tender.link
+                if key in seen:
+                    continue
+                seen.add(key)
+                tenders.append(tender)
+            self.logger.info("Etimad JSON page %d: %d tenders (oldest %s)", page_num, len(records), oldest)
+            if oldest is not None and oldest < oldest_wanted:
+                break
+        else:
+            self.record_run_error(f"Etimad: stopped after {self.API_MAX_PAGES} pages before reaching {self.LOOKBACK_HOURS} hours back")
+        return tenders
+
+    @staticmethod
+    def _api_records(text: str) -> list[dict]:
+        data = json.loads(text)
+        records = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(records, list):
+            raise ValueError("unexpected Etimad JSON: no data list")
+        return [r for r in records if isinstance(r, dict)]
+
+    def _parse_api_record(self, record: dict) -> Tender | None:
+        title = re.sub(r"\s+", " ", str(record.get("tenderName") or "")).strip()
+        id_string = str(record.get("tenderIdString") or "").strip()
+        if not title or not id_string:
+            return None
+
+        publish_raw = str(record.get("submitionDate") or "")
+        close_raw = str(record.get("lastOfferPresentationDate") or "")
+        agency = str(record.get("agencyName") or "").strip()
+        activity = str(record.get("tenderActivityName") or "").strip()
+        tender_type = str(record.get("tenderTypeName") or "").strip()
+        branch = str(record.get("branchName") or "").strip()
+        reference = str(record.get("referenceNumber") or "").strip()
+
+        raw_data = {
+            "etimad_stender_id": id_string,
+            "etimad_tender_id": str(record.get("tenderId") or ""),
+            "agency": agency,
+            "activity": activity,
+            "tender_type": tender_type,
+        }
+        if record.get("tenderNumber"):
+            raw_data["etimad_competition_number"] = str(record["tenderNumber"])
+        if record.get("tenderStatusName"):
+            raw_data["etimad_status"] = str(record["tenderStatusName"])
+        if record.get("condetionalBookletPrice"):
+            raw_data["booklet_price"] = record["condetionalBookletPrice"]
+
+        return Tender(
+            site=self.SITE_NAME,
+            title=title,
+            ref_number=reference or id_string,
+            publish_date=self._api_date(publish_raw),
+            close_date=self._api_date(close_raw),
+            publish_date_raw=publish_raw,
+            close_date_raw=close_raw,
+            link=self._full_url(f"/Tender/DetailsForVisitor?STenderId={id_string}"),
+            description=" | ".join(part for part in (agency, branch, activity, tender_type) if part),
+            raw_data=raw_data,
+        )
+
+    @staticmethod
+    def _api_date(value: str) -> datetime | None:
+        """Etimad JSON times are Riyadh local time without a zone ("2026-11-08T09:59:00.123")."""
+        match = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})", value or "")
+        if not match or match.group(1).startswith("0001"):
+            return None
+        return datetime.strptime(f"{match.group(1)} {match.group(2)}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=KSA_TZ)
+
+    async def _scrape_pages(self, page) -> list[Tender]:
+        """Fallback: the rendered visitor pages (6 tenders each), with detail pages for EV matches."""
+        tenders = []
+        for page_num in range(1, self.MAX_PAGES + 1):
+            url = f"{self.BASE_URL}?PageNumber={page_num}"
+            self.logger.info("Fetching Etimad page %d: %s", page_num, url)
+
+            try:
+                html = await self._load_listing_page(page, url)
+            except Exception as exc:
+                html = await page.content()
+                if "DetailsForVisitor" not in html:
+                    self.logger.exception("Failed to load Etimad page %d", page_num)
+                    self.record_run_error(f"Failed to load Etimad page {page_num}", exc)
+                    break
+                self.logger.warning("Etimad page %d load raised %s, but detail links were available", page_num, exc)
+
+            page_tenders = self._parse_page(html)
+            if not page_tenders:
+                self.logger.info("No tenders found on page %d — stopping", page_num)
+                break
+
+            page_tenders = await self._enrich_page_tenders(page, page_tenders)
+            tenders.extend(page_tenders)
+            self.logger.info("Found %d tenders on page %d", len(page_tenders), page_num)
         return tenders
 
     async def _load_listing_page(self, page, url: str) -> str:

@@ -6,7 +6,7 @@ from scrapers.base import Tender
 from utils.dates import KSA_TZ
 
 
-def test_filter_rejects_unparsed_source_dates(monkeypatch):
+def test_filter_keeps_tenders_with_unreadable_dates(monkeypatch):
     monkeypatch.setattr(main, "is_seen", lambda *args, **kwargs: False)
     monkeypatch.setattr(main, "mark_seen", lambda *args, **kwargs: None)
 
@@ -23,8 +23,8 @@ def test_filter_rejects_unparsed_source_dates(monkeypatch):
 
     matched, diagnostics = main.filter_tenders([tender])
 
-    assert matched == []
-    assert diagnostics.reject_counts["Etimad"]["unparsed_publish_date"] == 1
+    assert len(matched) == 1
+    assert diagnostics.reject_counts == {}
 
 
 def test_filter_keeps_missing_dates_conservative(monkeypatch):
@@ -75,3 +75,36 @@ def test_write_csv_overwrites_daily_snapshot_and_preserves_master(monkeypatch):
 
     assert daily_path.read_text(encoding="utf-8-sig").strip().count("\n") == 0
     assert master_path.read_text(encoding="utf-8-sig").strip().count("\n") == 1
+
+
+def _ev(site="Etimad", **kw):
+    return Tender(site=site, title="توريد وتركيب شواحن سيارات كهربائية", ref_number=kw.pop("ref", "R1"), **kw)
+
+
+def test_filter_keeps_long_and_late_found_tenders(monkeypatch):
+    monkeypatch.setattr(main, "is_seen", lambda *args, **kwargs: False)
+    now = datetime.now(KSA_TZ)
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    tenders = [
+        _ev(ref="long", publish_date=now - timedelta(days=1), close_date=now + timedelta(days=60)),
+        _ev(ref="late", publish_date=now - timedelta(days=20), close_date=now + timedelta(days=10)),
+        _ev(ref="today", publish_date=now - timedelta(days=3), close_date=today),
+    ]
+
+    matched, diagnostics = main.filter_tenders(tenders)
+
+    assert sorted(t.ref_number for t in matched) == ["late", "long", "today"]
+
+
+def test_filter_drops_closed_and_old_tenders(monkeypatch):
+    monkeypatch.setattr(main, "is_seen", lambda *args, **kwargs: False)
+    now = datetime.now(KSA_TZ)
+    tenders = [
+        _ev(ref="closed", publish_date=now - timedelta(days=5), close_date=now - timedelta(days=1, hours=1)),
+        _ev(ref="old", publish_date=now - timedelta(days=45), close_date=now + timedelta(days=5)),
+    ]
+
+    matched, diagnostics = main.filter_tenders(tenders)
+
+    assert matched == []
+    assert diagnostics.reject_counts["Etimad"] == {"already_closed": 1, "publish_window": 1}

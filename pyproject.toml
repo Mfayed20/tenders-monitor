@@ -10,3 +10,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 120
 target-version = "py313"
+
+[tool.ruff.lint]
+# The classic default set, so a newer ruff release does not turn CI red on its own.
+select = ["E4", "E7", "E9", "F"]

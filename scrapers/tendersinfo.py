@@ -28,7 +28,7 @@ class TendersInfoScraper(BaseScraper):
     SAUDI_COUNTRY_ID = "0300682"
     NOTICE_TYPE = "1, 3, 8"
     PAGE_SIZE = 50
-    MAX_PAGES = 3
+    MAX_PAGES = 10  # about 150 Saudi tenders a day: 10 pages reach back three days
 
     async def scrape(self, browser=None) -> list[Tender]:
         tenders = []
