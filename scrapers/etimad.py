@@ -12,6 +12,7 @@ late or missed is caught up by the next one.
 If the JSON list fails, the old way (the rendered pages, 6 tenders each) is used.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -34,8 +35,9 @@ class EtimadScraper(BaseScraper):
     NEEDS_BROWSER = True
 
     API_URL = "https://tenders.etimad.sa/Tender/AllSupplierTendersForVisitorAsync"
-    API_PAGE_SIZE = 100
-    API_MAX_PAGES = 60
+    API_PAGE_SIZE = 24  # the most the server returns per page
+    API_MAX_PAGES = 80
+    API_PAUSE_SECONDS = 3.5  # the server answers 429 above about 20 requests a minute
     LOOKBACK_HOURS = 96
     MAX_PAGES = 15  # rendered-page fallback
     GREGORIAN_DATE_RE = re.compile(
@@ -86,9 +88,24 @@ class EtimadScraper(BaseScraper):
         seen: set[str] = set()
         for page_num in range(1, self.API_MAX_PAGES + 1):
             url = f"{self.API_URL}?PageSize={self.API_PAGE_SIZE}&PageNumber={page_num}"
-            response = await context.request.get(url, timeout=60000, headers={"Accept": "application/json"})
-            if response.status != 200:
-                raise RuntimeError(f"HTTP {response.status} for page {page_num}")
+            if page_num > 1:
+                await asyncio.sleep(self.API_PAUSE_SECONDS)
+            try:
+                response = await context.request.get(url, timeout=60000, headers={"Accept": "application/json"})
+                for wait in (30, 65):
+                    if response.status != 429:
+                        break
+                    self.logger.warning("Etimad asked to slow down on page %d; waiting %ds", page_num, wait)
+                    await asyncio.sleep(wait)
+                    response = await context.request.get(url, timeout=60000, headers={"Accept": "application/json"})
+                if response.status != 200:
+                    raise RuntimeError(f"HTTP {response.status} for page {page_num}")
+            except Exception as exc:
+                if not tenders:
+                    raise
+                # keep what was read; the next run reads the same hours again
+                self.record_run_error(f"Etimad JSON list stopped at page {page_num} ({len(tenders)} tenders read)", exc)
+                break
             records = self._api_records(await response.text())
             if not records:
                 break

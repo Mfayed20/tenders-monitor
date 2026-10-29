@@ -41,6 +41,7 @@ from scrapers.base import Tender
 from utils.keywords import match_tender
 from utils.dates import is_new_tender, is_closing_soon, format_date, KSA_TZ, has_date_text
 from utils.dedup import is_seen, mark_seen, purge_old, set_db_path
+from utils.feed import feed_entry, merge_feed, read_feed, write_feed
 from utils.telegram_notifier import (
     send_telegram_alert,
     send_telegram_test_message,
@@ -71,6 +72,7 @@ class TenderRow:
     description: str  # tender description/scope (truncated)
     dedup_title: str = ""
     dedup_ref_number: str = ""
+    source: Tender | None = None
 
 
 @dataclass
@@ -116,6 +118,7 @@ class RuntimeSettings:
     disabled_scrapers: set[str] = field(default_factory=set)
     telegram_enabled: bool = True
     dry_run: bool = False
+    feed_path: Path | str | None = None  # the CRM feed (feed/tenders.json); off when unset
 
     def __post_init__(self) -> None:
         self.output_dir = Path(self.output_dir).expanduser()
@@ -124,6 +127,8 @@ class RuntimeSettings:
         else:
             self.seen_db_path = Path(self.seen_db_path).expanduser()
         self.log_level = self.log_level.upper()
+        if self.feed_path:
+            self.feed_path = Path(self.feed_path).expanduser()
 
     def validate(self, available_scrapers: set[str] | None = None) -> None:
         if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
@@ -271,6 +276,7 @@ def settings_from_args(args: argparse.Namespace) -> RuntimeSettings:
         disabled_scrapers=resolve_scraper_names(env_disabled + cli_disabled),
         telegram_enabled=telegram_enabled,
         dry_run=dry_run,
+        feed_path=os.getenv("TENDER_FEED_PATH") or None,
     )
     settings.validate({scraper.SITE_NAME for scraper in SCRAPERS})
     return settings
@@ -434,6 +440,7 @@ def filter_tenders(
     run_window_hours: int = DEFAULT_RUN_WINDOW_HOURS,
     close_window_days: int = DEFAULT_CLOSE_WINDOW_DAYS,
     dry_run: bool = False,
+    use_dedup: bool = True,
 ) -> tuple[list[TenderRow], FilterDiagnostics]:
     """
     Filter tenders by:
@@ -474,7 +481,7 @@ def filter_tenders(
             continue
 
         # Dedup
-        if is_seen(t.site, t.title, t.ref_number):
+        if use_dedup and is_seen(t.site, t.title, t.ref_number):
             logger.debug("Already seen: %s — %s", t.site, t.title[:50])
             diagnostics.record_reject(t.site, "dedup")
             continue
@@ -498,6 +505,7 @@ def filter_tenders(
             description=t.description[:200] if t.description else "",
             dedup_title=t.title,
             dedup_ref_number=t.ref_number,
+            source=t,
         ))
         diagnostics.record_match(t.site)
 
@@ -722,6 +730,24 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
     logger.info("Matched tenders after filtering: %d", len(matched))
     _log_filter_diagnostics(diagnostics)
 
+    # Step 2b: the CRM feed lists every current match (the Telegram dedup does not apply)
+    feed_written = False
+    if settings.feed_path:
+        try:
+            feed_rows, _ = filter_tenders(
+                all_tenders,
+                run_window_hours=settings.run_window_hours,
+                close_window_days=settings.close_window_days,
+                use_dedup=False,
+            )
+            now = datetime.now(KSA_TZ)
+            current = [feed_entry(row, row.source, now) for row in feed_rows]
+            merged = merge_feed(read_feed(Path(settings.feed_path)), current, now)
+            write_feed(Path(settings.feed_path), merged, _build_scraper_summary(scrape_stats, diagnostics), now)
+            feed_written = True
+        except Exception:
+            logger.exception("Writing the CRM tender feed failed")
+
     # Step 3: Write CSV (always, even if empty — for audit trail)
     csv_path = write_csv(
         matched,
@@ -760,6 +786,10 @@ async def execute_run(settings: RuntimeSettings) -> dict[str, Any]:
         telegram_sent=tg_ok,
         dedup_marked=dedup_marked,
     )
+    summary["feed"] = {"path": str(settings.feed_path or ""), "written": feed_written}
+    if settings.feed_path and not feed_written:
+        summary["status"] = "partial_failure"
+        summary["errors"].append("The CRM tender feed was not written")
     summary_path = write_run_summary(summary, settings.output_dir)
 
     # Summary

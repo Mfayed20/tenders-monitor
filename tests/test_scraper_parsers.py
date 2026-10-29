@@ -507,8 +507,21 @@ def test_etimad_json_list_reads_pages_until_lookback():
         request = FakeRequest()
 
     scraper = EtimadScraper()
+    scraper.API_PAUSE_SECONDS = 0
     tenders = asyncio.run(scraper._scrape_api(FakeContext()))
 
     assert [t.ref_number for t in tenders] == ["1", "2", "3", "4"]
     assert len(FakeContext.request.urls) == 2  # page 2 already reaches back past 96 hours
     assert tenders[0].close_date is None
+
+
+def test_tendersa_parser_reads_the_october_2026_cards():
+    tenders = TendersaScraper()._parse_page(_read_text("tendersa_tg.html"))
+
+    assert len(tenders) == 2
+    first = tenders[0]
+    assert first.ref_number == "1410093"
+    assert first.title == "Sale of scrap iron and damaged aluminum - unfit for use"
+    assert first.link == "https://www.tendersa.com/TenderDetails.aspx?tdc_id=1410093"
+    assert first.publish_date.strftime("%Y-%m-%d") == "2026-10-29"
+    assert first.close_date.strftime("%Y-%m-%d") == "2026-11-22"
