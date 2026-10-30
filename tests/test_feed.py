@@ -24,6 +24,13 @@ def test_feed_lists_matches_seen_before_and_keeps_first_seen(monkeypatch, tmp_pa
     assert first[0]["agency"] == "وزارة الصحة"
     assert first[0]["company"] == "Climatech"
     assert first[0]["closes"].startswith((now + timedelta(days=20)).strftime("%Y-%m-%d"))
+    assert "questions_by" not in first[0]  # only what the site gives
+
+    etimad = _tender("C")
+    etimad.raw_data.update({"tender_type": "منافسة عامة", "questions_by": "2026-11-08T15:02:49+03:00", "documents_price": 500.0})
+    rows, _ = main.filter_tenders([etimad], use_dedup=False)
+    item = main.feed_entry(rows[0], rows[0].source, now)
+    assert item["tender_type"] == "منافسة عامة" and item["questions_by"] == "2026-11-08T15:02:49+03:00" and item["documents_price"] == 500.0
 
     path = tmp_path / "feed" / "tenders.json"
     write_feed(path, merge_feed([], first, now), [{"site": "Etimad", "status": "ok", "raw_count": 9}], now)

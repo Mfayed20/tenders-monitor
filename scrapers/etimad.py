@@ -164,6 +164,18 @@ class EtimadScraper(BaseScraper):
             raw_data["etimad_status"] = str(record["tenderStatusName"])
         if record.get("condetionalBookletPrice"):
             raw_data["booklet_price"] = record["condetionalBookletPrice"]
+        # for the CRM lead: last day for questions, when offers are opened, what the documents cost
+        questions_by = self._api_date(str(record.get("lastEnqueriesDate") or ""))
+        opens = self._api_date(str(record.get("offersOpeningDate") or ""))
+        if questions_by:
+            raw_data["questions_by"] = questions_by.isoformat()
+        if opens:
+            raw_data["opens"] = opens.isoformat()
+        price = record.get("condetionalBookletPrice") or record.get("buyingCost")
+        if isinstance(price, (int, float)) and price > 0:
+            raw_data["documents_price"] = price
+        if branch:
+            raw_data["branch"] = branch
 
         return Tender(
             site=self.SITE_NAME,

@@ -30,7 +30,7 @@ def tender_key(site: str, ref_number: str, link: str) -> str:
 def feed_entry(row: Any, raw: Any, now: datetime) -> dict[str, Any]:
     """One feed item from a matched TenderRow and its source Tender."""
     extra = getattr(raw, "raw_data", None) or {}
-    return {
+    entry = {
         "key": tender_key(row.site, raw.ref_number if raw else row.ref_number, row.link),
         "site": row.site,
         "ref": raw.ref_number if raw and raw.ref_number else ("" if row.ref_number == "N/A" else row.ref_number),
@@ -45,6 +45,12 @@ def feed_entry(row: Any, raw: Any, now: datetime) -> dict[str, Any]:
         "description": (raw.description if raw else row.description or "")[:500],
         "first_seen": now.isoformat(),
     }
+    # Etimad only: tender type, last day for questions, offers opening, documents price, department
+    for key in ("tender_type", "questions_by", "opens", "documents_price", "branch"):
+        value = extra.get(key)
+        if value not in (None, ""):
+            entry[key] = value if isinstance(value, (int, float)) else str(value)[:200]
+    return entry
 
 
 def _parse(value: str) -> datetime | None:

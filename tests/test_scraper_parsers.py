@@ -468,6 +468,13 @@ def test_etimad_json_record_parses_agency_dates_and_link():
     assert tender.link.startswith("https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=")
     assert data["data"][1]["agencyName"] in tender.description
     assert tender.raw_data["agency"] == data["data"][1]["agencyName"]
+    assert tender.raw_data["questions_by"].startswith("2026-11-08T15:02:49")
+    assert tender.raw_data["opens"].startswith("2026-11-29T10:00:00")
+    assert tender.raw_data["documents_price"] == 500.0
+    assert tender.raw_data["tender_type"] == "منافسة عامة"
+
+    direct = scraper._parse_api_record(data["data"][0])  # direct purchase: no opening date, documents free
+    assert "opens" not in direct.raw_data and "documents_price" not in direct.raw_data
 
 
 def test_etimad_json_list_reads_pages_until_lookback():
