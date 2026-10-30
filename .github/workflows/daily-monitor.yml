@@ -2,10 +2,11 @@ name: Daily Tender Monitor
 
 on:
   schedule:
-    # 07:00, 12:00, and 17:00 Asia/Riyadh (UTC+3).
-    - cron: "0 4 * * *"
-    - cron: "0 9 * * *"
-    - cron: "0 14 * * *"
+    # About 07:15, 12:15, and 17:15 Asia/Riyadh (UTC+3). Not on the hour: GitHub delays or drops
+    # many scheduled runs at :00 (the 14:00 and 04:00 runs of 2026-10-29/30 never started).
+    - cron: "17 4 * * *"
+    - cron: "17 9 * * *"
+    - cron: "17 14 * * *"
   workflow_dispatch:
     inputs:
       telegram_test:
