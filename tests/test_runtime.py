@@ -46,9 +46,9 @@ def test_settings_rejects_unknown_scraper():
 def test_daily_monitor_schedule_runs_before_common_morning_deadlines():
     workflow = Path(".github/workflows/daily-monitor.yml").read_text(encoding="utf-8")
 
-    assert 'cron: "0 4 * * *"' in workflow
-    assert 'cron: "0 9 * * *"' in workflow
-    assert 'cron: "0 14 * * *"' in workflow
+    assert 'cron: "17 4 * * *"' in workflow
+    assert 'cron: "17 9 * * *"' in workflow
+    assert 'cron: "17 14 * * *"' in workflow
 
 
 def test_dedup_database_path_is_injectable(tmp_path):
