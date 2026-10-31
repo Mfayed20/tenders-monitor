@@ -1,0 +1,116 @@
+{
+ "version": 1,
+ "generated_at": "2026-10-31T15:24:44.370595+00:00",
+ "status": "ok",
+ "sources": [
+  {
+   "site": "Etimad",
+   "status": "ok",
+   "raw_count": 360,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "KSATendersGate",
+   "status": "ok",
+   "raw_count": 299,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "METenders",
+   "status": "ok",
+   "raw_count": 10,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TenderSA",
+   "status": "ok",
+   "raw_count": 30,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TendersInfo",
+   "status": "ok",
+   "raw_count": 465,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TendersOnTime",
+   "status": "ok",
+   "raw_count": 100,
+   "matched_count": 0,
+   "error": ""
+  }
+ ],
+ "tenders": [
+  {
+   "key": "TendersInfo:539563410",
+   "site": "TendersInfo",
+   "ref": "539563410",
+   "title": "Establishing Outlets For Electric Car Chargers Powered By Solar Energy.",
+   "link": "https://www.tendersinfo.com/tenders_details/establishing-outlets-electric-car-chargers-powered-539563410",
+   "published": "2026-10-29T00:00:00+03:00",
+   "closes": "2026-11-15T00:00:00+03:00",
+   "company": "Climatech",
+   "keywords": "charger",
+   "agency": "",
+   "activity": "",
+   "description": "Renewable Energy | Saudi Arabia | Tender Authority:SPECIAL FORCES FOR SECURITY AND PROTECTION",
+   "first_seen": "2026-10-30T22:23:47.894362+03:00"
+  },
+  {
+   "key": "TenderSA:1410730",
+   "site": "TenderSA",
+   "ref": "1410730",
+   "title": "Installation of Solar-Powered Electric Vehicle Charging Outlets",
+   "link": "https://www.tendersa.com/TenderDetails.aspx?tdc_id=1410730",
+   "published": "2026-10-29T00:00:00+03:00",
+   "closes": "2026-11-15T00:00:00+03:00",
+   "company": "Climatech",
+   "keywords": "electric vehicle charging",
+   "agency": "",
+   "activity": "",
+   "description": "Invitation for Bid - IFB New 1410730 Governmental Installation of Solar-Powered Electric Vehicle Charging Outlets Publish Date October 29, 2026 15 Days Deadline November 15, 2026 — Details 5 Electromechanical Click to show subcategories 1 category Electromechanical Renewable Energy 67",
+   "first_seen": "2026-10-30T22:23:47.894362+03:00"
+  },
+  {
+   "key": "KSATendersGate:https://ksatendersgate.com/tenders/h-ah-hr422309-supply-of-wall-mounted-charging-stations-with-integrated-charging-cables-in-the-rest-area-of-king-abdulaziz-hospital-in-al-ahsa-affiliated-with-the-ministry-of-nationa/",
+   "site": "KSATendersGate",
+   "ref": "",
+   "title": "H-AH-HR422309 Supply of wall-mounted charging stations with integrated charging cables in the rest area of ​​King Abdulaziz Hospital in Al-Ahsa, affiliated with the Ministry of National Guard Health Affairs",
+   "link": "https://ksatendersgate.com/tenders/h-ah-hr422309-supply-of-wall-mounted-charging-stations-with-integrated-charging-cables-in-the-rest-area-of-king-abdulaziz-hospital-in-al-ahsa-affiliated-with-the-ministry-of-nationa/",
+   "published": "2026-10-11T10:46:23+03:00",
+   "closes": "",
+   "company": "Climatech",
+   "keywords": "charging station",
+   "agency": "",
+   "activity": "",
+   "description": "",
+   "first_seen": "2026-10-29T18:06:57.526693+03:00"
+  },
+  {
+   "key": "Etimad:261039004342",
+   "site": "Etimad",
+   "ref": "261039004342",
+   "title": "أعمال تأسيس منافذ لشواحن السيارات الكهربائية تعمل بنظام الطاقة الشمسية",
+   "link": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=SM0YehTOkEgmIRCEL53G0g==",
+   "published": "2026-10-29T10:36:55+03:00",
+   "closes": "2026-11-15T10:00:00+03:00",
+   "company": "Climatech",
+   "keywords": "شواحن سيارات, شواحن",
+   "agency": "القوات الخاصة للأمن والحماية",
+   "activity": "مقاولات عامة للمباني (الانشاء، الإصلاح، الهدم، الترميم)",
+   "description": "القوات الخاصة للأمن والحماية | المقر الرئيسي | مقاولات عامة للمباني (الانشاء، الإصلاح، الهدم، الترميم) | منافسة عامة",
+   "first_seen": "2026-10-29T15:48:56.405905+03:00",
+   "tender_type": "منافسة عامة",
+   "questions_by": "2026-11-08T00:00:00+03:00",
+   "opens": "2026-11-15T10:00:00+03:00",
+   "documents_price": 200.0,
+   "branch": "المقر الرئيسي"
+  }
+ ]
+}
