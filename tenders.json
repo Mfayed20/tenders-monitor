@@ -1,0 +1,99 @@
+{
+ "version": 1,
+ "generated_at": "2026-11-28T09:12:35.884587+00:00",
+ "status": "partial_failure",
+ "sources": [
+  {
+   "site": "Etimad",
+   "status": "ok",
+   "raw_count": 312,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "KSATendersGate",
+   "status": "partial_failure",
+   "raw_count": 0,
+   "matched_count": 0,
+   "error": "Failed to fetch KSAGate API page 3: HTTPStatusError: Client error '404 Not Found' for url 'https://ksatendersgate.com/wp-json/wp/v2/tenders?per_page=100&page=3'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404 | Failed to fetch KSAGate API page 2: HTTPStatusError: Client error '404 Not Found' for url 'https://ksatendersgate.com/wp-json/wp/v2/tenders?per_page=100&page=2'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404 | Failed to fetch KSAGate API page 1: HTTPStatusError: Client error '404 Not Found' for url 'https://ksatendersgate.com/wp-json/wp/v2/tenders?per_page=100&page=1'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+  },
+  {
+   "site": "METenders",
+   "status": "ok",
+   "raw_count": 14,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TenderSA",
+   "status": "partial_failure",
+   "raw_count": 0,
+   "matched_count": 0,
+   "error": "TenderSA returned no tenders"
+  },
+  {
+   "site": "TendersInfo",
+   "status": "ok",
+   "raw_count": 483,
+   "matched_count": 0,
+   "error": ""
+  },
+  {
+   "site": "TendersOnTime",
+   "status": "ok",
+   "raw_count": 100,
+   "matched_count": 0,
+   "error": ""
+  }
+ ],
+ "tenders": [
+  {
+   "key": "TendersInfo:540250588",
+   "site": "TendersInfo",
+   "ref": "540250588",
+   "title": "Supply Tac-w22-s-r-c-0 Terra Ac Wallbox Type 2",
+   "link": "https://www.tendersinfo.com/tenders_details/tac-w22-terra-wallbox-540250588",
+   "published": "2026-11-16T00:00:00+03:00",
+   "closes": "2026-11-30T00:00:00+03:00",
+   "company": "Climatech",
+   "keywords": "wallbox",
+   "agency": "",
+   "activity": "",
+   "description": "Telecommunications | Saudi Arabia | Tender Authority:KING FAHAD HOSPITAL IN JEDDAH",
+   "first_seen": "2026-11-16T15:02:26.188056+03:00"
+  },
+  {
+   "key": "Etimad:261139003593",
+   "site": "Etimad",
+   "ref": "261139003593",
+   "title": "SUPPLY TAC-W22-S-R-C-0 TERRA AC WALLBOX TYPE 2",
+   "link": "https://tenders.etimad.sa/Tender/DetailsForVisitor?STenderId=Ucr5f1w0mv2gcLqhFGzBTQ==",
+   "published": "2026-11-15T12:18:27+03:00",
+   "closes": "2026-11-30T09:59:00+03:00",
+   "company": "Climatech",
+   "keywords": "wallbox",
+   "agency": "مستشفى الملك فهد بجدة",
+   "activity": "التشغيل والصيانة والنظافة للمنشآت - التشغيل والصيانة",
+   "description": "مستشفى الملك فهد بجدة | الشراء المباشر | التشغيل والصيانة والنظافة للمنشآت - التشغيل والصيانة | شراء مباشر",
+   "first_seen": "2026-11-15T14:17:16.450346+03:00",
+   "tender_type": "شراء مباشر",
+   "questions_by": "2026-11-20T12:18:27+03:00",
+   "branch": "الشراء المباشر"
+  },
+  {
+   "key": "KSATendersGate:https://ksatendersgate.com/tenders/h-ah-hr422309-supply-of-wall-mounted-charging-stations-with-integrated-charging-cables-in-the-rest-area-of-king-abdulaziz-hospital-in-al-ahsa-affiliated-with-the-ministry-of-nationa/",
+   "site": "KSATendersGate",
+   "ref": "",
+   "title": "H-AH-HR422309 Supply of wall-mounted charging stations with integrated charging cables in the rest area of ​​King Abdulaziz Hospital in Al-Ahsa, affiliated with the Ministry of National Guard Health Affairs",
+   "link": "https://ksatendersgate.com/tenders/h-ah-hr422309-supply-of-wall-mounted-charging-stations-with-integrated-charging-cables-in-the-rest-area-of-king-abdulaziz-hospital-in-al-ahsa-affiliated-with-the-ministry-of-nationa/",
+   "published": "2026-10-11T10:46:23+03:00",
+   "closes": "",
+   "company": "Climatech",
+   "keywords": "charging station",
+   "agency": "",
+   "activity": "",
+   "description": "",
+   "first_seen": "2026-10-29T18:06:57.526693+03:00"
+  }
+ ]
+}
